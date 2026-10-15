@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>台灣飲食熱量與營養管理 (全功能旗艦版)</title>
+  <title>台灣飲食熱量與營養管理 (支援外部 food.json)</title>
   
   <!-- iOS 專屬 PWA 全螢幕與圖示支援 -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -86,7 +86,6 @@
     button:active { opacity: 0.8; }
     .btn-secondary { background: #e2e8f0; color: #334155; }
     
-    /* 條碼與相機按鈕 */
     .btn-barcode {
       background: linear-gradient(135deg, #059669, #10b981);
       width: 100%;
@@ -113,7 +112,6 @@
       border: 2px dashed var(--border);
     }
 
-    /* AI 拍照按鈕 */
     .btn-ai {
       background: linear-gradient(135deg, #6366f1, #8b5cf6);
       width: 100%;
@@ -144,7 +142,6 @@
       display: none;
     }
 
-    /* 警示橫幅 */
     .alert-banner {
       padding: 8px 12px;
       border-radius: 8px;
@@ -156,7 +153,6 @@
     .alert-warning { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; display: block; }
     .alert-danger { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; display: block; }
 
-    /* 搜尋下拉框 */
     .search-wrapper { position: relative; margin-bottom: 8px; }
     .suggestions {
       position: absolute;
@@ -195,7 +191,6 @@
     .badge-family { background: var(--tag-family); }
     .badge-food { background: var(--tag-food); }
 
-    /* 常用快捷標籤 */
     .quick-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
     .chip {
       background: #eff6ff;
@@ -342,7 +337,7 @@
     </details>
   </div>
 
-  <!-- 食物資料庫搜尋 (超商 + TFDA) -->
+  <!-- 食物資料庫搜尋 (超商 + TFDA + 外部 JSON) -->
   <div class="card">
     <div style="display:flex; justify-content:space-between; align-items:center;">
       <h3 style="margin:0;">🔍 搜尋飲食庫</h3>
@@ -378,7 +373,7 @@
 
   <script>
     // 預設內建資料庫 (涵蓋超商鮮食、條碼與 TFDA 原型食材)
-    const defaultDatabase = [
+    let defaultDatabase = [
       // 常用超商條碼商品
       { barcode: "4710088430930", type: "7-11", name: "統一無糖高纖豆漿 (450ml)", cal: 161, protein: 15.3, per100g: false },
       { barcode: "4710088430923", type: "7-11", name: "統一低糖高纖豆漿 (450ml)", cal: 189, protein: 15.3, per100g: false },
@@ -439,7 +434,25 @@
       { type: "TFDA", name: "水煮蛋 / 生雞蛋", cal: 144, protein: 12.8, per100g: true }
     ];
 
-    // 載入自訂學習之本地條碼
+    // 自動非同步讀取同目錄下的 food.json (或 foods.json)
+    async function loadExternalFoods() {
+      const candidates = ['food.json', 'foods.json'];
+      for (const file of candidates) {
+        try {
+          const res = await fetch(file);
+          if (res.ok) {
+            const externalFoods = await res.json();
+            defaultDatabase.unshift(...externalFoods);
+            renderQuickChips();
+            console.log(`成功載入外部檔案 ${file}，新增 ${externalFoods.length} 筆資料！`);
+            break;
+          }
+        } catch (err) {
+          // 嘗試下一個候選檔名
+        }
+      }
+    }
+
     function getFullDatabase() {
       const customBarcodes = JSON.parse(localStorage.getItem('calorie_custom_barcodes') || '[]');
       return [...customBarcodes, ...defaultDatabase];
@@ -531,7 +544,7 @@
       render();
     }
 
-    // 條碼掃描相機核心控制
+    // 條碼掃描相機控制
     let html5QrCode = null;
     let isScanning = false;
 
@@ -592,7 +605,7 @@
       const matched = db.find(item => item.barcode === decodedText);
       if (matched) {
         fillForm(matched.name, matched.cal, matched.protein);
-        status.innerText = `找到本地商品：${matched.name} (${matched.cal} kcal)`;
+        status.innerText = `找到商品：${matched.name} (${matched.cal} kcal)`;
         stopScanner();
         return;
       }
@@ -693,7 +706,8 @@
         defaultDatabase[10], // 地瓜
         defaultDatabase[21], // 全家 健身餐盒
         defaultDatabase[36]  // TFDA 去皮雞胸肉
-      ];
+      ].filter(Boolean);
+
       container.innerHTML = '';
       popular.forEach(item => {
         const chip = document.createElement('div');
@@ -782,7 +796,6 @@
       const protein = document.getElementById('entryProtein').value;
       if (!name) return;
 
-      // 若剛剛有掃到新條碼，自動學習記住
       if (lastScannedBarcode) {
         const custom = JSON.parse(localStorage.getItem('calorie_custom_barcodes') || '[]');
         custom.push({ barcode: lastScannedBarcode, type: "自訂", name, cal: Number(cal) || 0, protein: Number(protein) || 0 });
@@ -891,6 +904,8 @@
       render();
     });
 
+    // 依序初始化載入
+    loadExternalFoods();
     loadProfile();
     renderQuickChips();
     render();
