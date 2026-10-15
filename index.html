@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>台灣飲食熱量與營養管理 (Gemini 3.8 Flash 三餐版)</title>
+  <title>台灣飲食熱量與營養管理 (含4週體重預估)</title>
   
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -152,6 +152,10 @@
     .alert-danger { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; display: block; }
 
     /* 搜尋框與浮動選單核心樣式 */
+    .search-card {
+      overflow: visible !important;
+      z-index: 50;
+    }
     .search-wrapper { 
       position: relative; 
       width: 100%; 
@@ -166,22 +170,20 @@
       border-radius: 8px;
       max-height: 280px;
       overflow-y: auto;
-      z-index: 100;
-      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      z-index: 9999;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
       display: none;
     }
     .suggestion-item {
-      padding: 10px 12px;
+      padding: 12px;
       cursor: pointer;
       border-bottom: 1px solid #f1f5f9;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-size: 13px;
+      font-size: 14px;
     }
-    .suggestion-item:active, .suggestion-item:hover {
-      background-color: #f8fafc;
-    }
+    .suggestion-item:active { background-color: #f1f5f9; }
     .badge {
       font-size: 11px;
       padding: 2px 6px;
@@ -235,11 +237,23 @@
       border-bottom: 1px solid #f1f5f9;
     }
     .delete-btn { background: var(--danger); padding: 4px 8px; font-size: 12px; border-radius: 4px; }
+    
+    /* 預測體重卡片樣式 */
+    .prediction-box {
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      color: #065f46;
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 10px;
+      font-size: 13px;
+      line-height: 1.6;
+    }
   </style>
 </head>
 <body>
 
-  <!-- 今日總覽與超標警示卡片 -->
+  <!-- 今日總覽卡片 -->
   <div class="card">
     <div style="display:flex; justify-content:space-between; align-items:center;">
       <h2 style="margin:0;">飲食熱量統計</h2>
@@ -262,7 +276,7 @@
     </div>
   </div>
 
-  <!-- AI 拍照辨識區塊 (使用 Gemini 3.8 Flash) -->
+  <!-- AI 拍照辨識區塊 -->
   <div class="card">
     <h3>📸 AI 拍照辨識食物 (Gemini 3.8 Flash)</h3>
     <div class="camera-wrapper">
@@ -300,21 +314,21 @@
     </div>
   </div>
 
-  <!-- 食物資料庫搜尋 (已修復結構與浮動選單) -->
-  <div class="card">
+  <!-- 食物資料庫搜尋 -->
+  <div class="card search-card">
     <div style="display:flex; justify-content:space-between; align-items:center;">
       <h3 style="margin:0;">🔍 搜尋飲食庫</h3>
       <span style="font-size:12px; color:var(--muted);" id="dbCountText">收錄 0 筆食品</span>
     </div>
     <div class="search-wrapper" style="margin-top:8px;">
-      <input type="text" id="foodSearch" placeholder="搜尋 7-11、全家、小吃、地瓜、雞胸肉..." oninput="handleSearch()" autocomplete="off">
+      <input type="text" id="foodSearch" placeholder="搜尋 7-11、全家、小吃、地瓜、雞胸肉..." autocomplete="off">
       <div id="suggestions" class="suggestions"></div>
     </div>
     <div style="font-size: 12px; color: var(--muted); margin-top:8px;">常用快選：</div>
     <div class="quick-chips" id="quickChips"></div>
   </div>
 
-  <!-- 確認加入與新增區塊 (含餐別選擇) -->
+  <!-- 確認加入與新增區塊 -->
   <div class="card">
     <h3>確認加入清單</h3>
     <div class="input-group">
@@ -333,39 +347,39 @@
     <button style="width: 100%;" onclick="submitEntry()">確認加入今日清單</button>
   </div>
 
-  <!-- TDEE 自動計算機 (預設收合) -->
+  <!-- TDEE 自動計算機 (含4週體重預估) -->
   <div class="card">
     <details id="tdeeDetails">
-      <summary style="font-weight: 600; cursor: pointer; color: #475569;">⚙️ 設定熱量目標與 TDEE 自動計算 (點擊展開)</summary>
+      <summary style="font-weight: 600; cursor: pointer; color: #475569;">⚙️ 設定熱量目標與 4 週體重預估 (點擊展開)</summary>
       <div style="margin-top: 12px;">
         <div class="grid-2">
           <div>
             <label style="font-size: 12px; color: var(--muted);">性別</label>
-            <select id="userGender">
+            <select id="userGender" onchange="calculateTDEE()">
               <option value="male">生理男</option>
               <option value="female">生理女</option>
             </select>
           </div>
           <div>
             <label style="font-size: 12px; color: var(--muted);">年齡 (歲)</label>
-            <input type="number" id="userAge" placeholder="例如: 30">
+            <input type="number" id="userAge" placeholder="例如: 30" oninput="calculateTDEE()">
           </div>
         </div>
 
         <div class="grid-2">
           <div>
             <label style="font-size: 12px; color: var(--muted);">身高 (cm)</label>
-            <input type="number" id="userHeight" placeholder="例如: 175">
+            <input type="number" id="userHeight" placeholder="例如: 175" oninput="calculateTDEE()">
           </div>
           <div>
-            <label style="font-size: 12px; color: var(--muted);">體重 (kg)</label>
-            <input type="number" id="userWeight" placeholder="例如: 75">
+            <label style="font-size: 12px; color: var(--muted);">目前體重 (kg)</label>
+            <input type="number" id="userWeight" placeholder="例如: 75" oninput="calculateTDEE()" step="0.1">
           </div>
         </div>
 
         <div style="margin-bottom: 8px;">
           <label style="font-size: 12px; color: var(--muted);">每週活動量</label>
-          <select id="userActivity" style="width: 100%;">
+          <select id="userActivity" style="width: 100%;" onchange="calculateTDEE()">
             <option value="1.2">久坐 / 幾乎不運動</option>
             <option value="1.375">輕度活動 (每週運動 1-3 天)</option>
             <option value="1.55" selected>中度活動 (每週運動 3-5 天)</option>
@@ -385,15 +399,18 @@
 
         <button style="width: 100%; margin-bottom: 10px;" onclick="calculateAndSaveProfile()">⚡ 自動估算並儲存目標</button>
 
-        <div style="font-size: 13px; color: #334155; line-height: 1.6; background: #f1f5f9; padding: 10px; border-radius: 8px; margin-bottom: 12px;">
+        <div style="font-size: 13px; color: #334155; line-height: 1.6; background: #f1f5f9; padding: 10px; border-radius: 8px; margin-bottom: 8px;">
           基礎代謝 (BMR)：<strong id="bmrDisplay">--</strong> kcal<br>
           每日總消耗 (TDEE)：<strong id="tdeeDisplay">--</strong> kcal<br>
           建議每日熱量上限：<strong id="recCalDisplay">--</strong> kcal
         </div>
 
-        <div style="font-weight: 600; font-size: 13px; margin-bottom: 6px;">手動覆寫目標數值：</div>
+        <!-- 4 週體重預估結果面板 -->
+        <div id="predictionBox" class="prediction-box" style="display:none;"></div>
+
+        <div style="font-weight: 600; font-size: 13px; margin: 12px 0 6px 0;">手動覆寫目標數值：</div>
         <div class="input-group">
-          <input type="number" id="targetCalInput" placeholder="每日目標熱量 (kcal)">
+          <input type="number" id="targetCalInput" placeholder="每日目標熱量 (kcal)" oninput="updatePredictionFromCustom()">
           <input type="number" id="targetProteinInput" placeholder="每日目標蛋白質 (g)">
         </div>
         <button class="btn-secondary" style="width: 100%;" onclick="saveCustomTargets()">儲存自訂數值</button>
@@ -401,7 +418,7 @@
     </details>
   </div>
 
-  <!-- 當日明細清單與備份匯出 (三餐分組) -->
+  <!-- 當日明細清單與備份匯出 -->
   <div class="card">
     <div style="display:flex; justify-content:space-between; align-items:center;">
       <h3 style="margin:0;">今日飲食明細</h3>
@@ -433,30 +450,21 @@
       { type: "TFDA", name: "白米飯", cal: 183, protein: 3.1, per100g: true }
     ];
 
-    // 自動讀取外部 JSON 資料庫
+    // 同時讀取多個 JSON 資料庫並合併去重
     async function loadExternalFoods() {
-      const githubUrl = localStorage.getItem('github_db_url');
-      const candidateUrls = [];
-      if (githubUrl) candidateUrls.push(githubUrl);
-      
-      candidateUrls.push(
-        'food.json',
-        'foods.json',
-        '300.json',
-        encodeURI('300種.json')
-      );
+      const filesToLoad = ['food.json', 'food2.json'];
+      const customUrl = localStorage.getItem('github_db_url');
+      if (customUrl) filesToLoad.unshift(customUrl);
 
-      for (const url of candidateUrls) {
+      for (const fileUrl of filesToLoad) {
         try {
-          const res = await fetch(url);
+          const res = await fetch(fileUrl);
           if (res.ok) {
             const externalFoods = await res.json();
             if (Array.isArray(externalFoods) && externalFoods.length > 0) {
               const existingNames = new Set(defaultDatabase.map(item => item.name));
               const newItems = externalFoods.filter(item => item && item.name && !existingNames.has(item.name));
               defaultDatabase.unshift(...newItems);
-              renderQuickChips();
-              break;
             }
           }
         } catch (err) {}
@@ -498,9 +506,12 @@
       document.getElementById('targetCalDisplay').innerText = targetCal;
       document.getElementById('targetProteinDisplay').innerText = targetProtein;
 
-      if (profile.weight && profile.height && profile.age) calculateTDEE();
+      if (profile.weight && profile.height && profile.age) {
+        calculateTDEE();
+      }
     }
 
+    // 計算 TDEE 並即時估算 4 週體重
     function calculateTDEE() {
       const gender = document.getElementById('userGender').value;
       const age = Number(document.getElementById('userAge').value);
@@ -525,7 +536,66 @@
       document.getElementById('tdeeDisplay').innerText = tdee;
       document.getElementById('recCalDisplay').innerText = recCal;
 
+      renderWeightPrediction(weight, tdee, recCal);
+
       return { bmr, tdee, recCal, recProtein, gender, age, height, weight, activity, goal };
+    }
+
+    // 計算並渲染 4 週後的預估體重
+    function renderWeightPrediction(currentWeight, tdee, targetCal) {
+      const box = document.getElementById('predictionBox');
+      if (!currentWeight || !tdee || !targetCal) {
+        box.style.display = 'none';
+        return;
+      }
+
+      // 每日熱量缺口 (負為赤字，正為盈餘)
+      const dailyDeficit = targetCal - tdee;
+      // 4週 (28天) 總熱量差，除以 7700 kcal = 體重預估變化 (kg)
+      const totalDeficit = dailyDeficit * 28;
+      const weightChangeKg = totalDeficit / 7700;
+      const predictedWeight = currentWeight + weightChangeKg;
+      const weeklyRate = Math.abs(weightChangeKg) / 4;
+
+      let statusMsg = "";
+      if (weightChangeKg < -0.1) {
+        box.style.background = "#ecfdf5";
+        box.style.borderColor = "#a7f3d0";
+        box.style.color = "#065f46";
+        statusMsg = `📉 <strong>減脂赤字模式</strong><br>` +
+                    `目前體重：<strong>${currentWeight.toFixed(1)} kg</strong><br>` +
+                    `預計 4 週後體重：<strong>${predictedWeight.toFixed(1)} kg</strong> ` +
+                    `（預計減去 <strong>${Math.abs(weightChangeKg).toFixed(1)} kg</strong>）<br>` +
+                    `<span style="font-size:12px; color:#047857;">每週預計減重約 ${weeklyRate.toFixed(2)} kg，屬於健康安全減脂步調。</span>`;
+      } else if (weightChangeKg > 0.1) {
+        box.style.background = "#fef3c7";
+        box.style.borderColor = "#fde68a";
+        box.style.color = "#92400e";
+        statusMsg = `📈 <strong>增肌熱量盈餘模式</strong><br>` +
+                    `目前體重：<strong>${currentWeight.toFixed(1)} kg</strong><br>` +
+                    `預計 4 週後體重：<strong>${predictedWeight.toFixed(1)} kg</strong> ` +
+                    `（預計增重 <strong>${weightChangeKg.toFixed(1)} kg</strong>）<br>` +
+                    `<span style="font-size:12px; color:#b45309;">每週增加約 ${weeklyRate.toFixed(2)} kg，建議搭配阻力訓練以轉化為肌肉量。</span>`;
+      } else {
+        box.style.background = "#f1f5f9";
+        box.style.borderColor = "#cbd5e1";
+        box.style.color = "#334155";
+        statusMsg = `⚖️ <strong>體重平衡維護模式</strong><br>` +
+                    `目前體重：<strong>${currentWeight.toFixed(1)} kg</strong><br>` +
+                    `預計 4 週後體重維持在約 <strong>${predictedWeight.toFixed(1)} kg</strong>。`;
+      }
+
+      box.innerHTML = statusMsg;
+      box.style.display = 'block';
+    }
+
+    function updatePredictionFromCustom() {
+      const weight = Number(document.getElementById('userWeight').value);
+      const tdee = Number(document.getElementById('tdeeDisplay').innerText);
+      const customCal = Number(document.getElementById('targetCalInput').value);
+      if (weight && tdee && customCal) {
+        renderWeightPrediction(weight, tdee, customCal);
+      }
     }
 
     function calculateAndSaveProfile() {
@@ -544,7 +614,7 @@
       document.getElementById('targetProteinInput').value = res.recProtein;
       document.getElementById('targetCalDisplay').innerText = res.recCal;
       document.getElementById('targetProteinDisplay').innerText = res.recProtein;
-      alert(`已成功設定每日目標熱量為 ${res.recCal} kcal，蛋白質為 ${res.recProtein} g。`);
+      alert(`已更新設定！每日目標為 ${res.recCal} kcal，已同步預估 4 週後體重趨勢。`);
       render();
     }
 
@@ -559,7 +629,8 @@
         localStorage.setItem('calorie_target_protein', protein);
         document.getElementById('targetProteinDisplay').innerText = protein;
       }
-      alert('已更新自訂目標！');
+      updatePredictionFromCustom();
+      alert('已更新自訂數值！');
       render();
     }
 
@@ -653,7 +724,7 @@
 
     let lastScannedBarcode = null;
 
-    // AI 拍照辨識：指定使用 Gemini 3.8 Flash
+    // AI 拍照辨識：Gemini 3.8 Flash
     async function handleImage(event) {
       const file = event.target.files[0];
       if (!file) return;
@@ -767,13 +838,13 @@
       document.getElementById('dbCountText').innerText = `收錄 ${db.length} 筆食品`;
     }
 
-    // 搜尋功能實作
-    function handleSearch() {
-      const input = document.getElementById('foodSearch');
+    // 核心搜尋邏輯
+    function executeSearch(query) {
       const suggestions = document.getElementById('suggestions');
-      if (!input || !suggestions) return;
+      const input = document.getElementById('foodSearch');
+      if (!suggestions) return;
 
-      const q = input.value.trim().toLowerCase();
+      const q = (query !== undefined ? query : input.value).trim().toLowerCase();
       if (!q) {
         suggestions.style.display = 'none';
         return;
@@ -789,7 +860,7 @@
       });
 
       if (matches.length === 0) {
-        suggestions.innerHTML = '<div style="padding:12px; font-size:13px; color:var(--muted); text-align:center;">無符合的食品項目</div>';
+        suggestions.innerHTML = '<div style="padding:14px; font-size:13px; color:var(--muted); text-align:center;">無符合的食品項目</div>';
         suggestions.style.display = 'block';
         return;
       }
@@ -806,9 +877,10 @@
         const unitText = item.per100g ? "/100g" : "";
         div.innerHTML = `
           <span><span class="badge ${badgeClass}">${item.type || '食品'}</span>${item.name}</span>
-          <span style="color:var(--muted);">${item.cal} kcal | 蛋 ${item.protein}g ${unitText}</span>
+          <span style="color:var(--muted); font-size:12px;">${item.cal} kcal | 蛋 ${item.protein}g ${unitText}</span>
         `;
-        div.onclick = () => {
+        div.onmousedown = (e) => {
+          e.preventDefault();
           selectItem(item);
           suggestions.style.display = 'none';
           input.value = '';
@@ -818,7 +890,21 @@
       suggestions.style.display = 'block';
     }
 
-    // 點擊空白處自動隱藏選單
+    const searchInput = document.getElementById('foodSearch');
+    let isComposing = false;
+
+    searchInput.addEventListener('compositionstart', () => { isComposing = true; });
+    searchInput.addEventListener('compositionend', (e) => {
+      isComposing = false;
+      executeSearch(e.target.value);
+    });
+    searchInput.addEventListener('input', (e) => {
+      if (!isComposing) executeSearch(e.target.value);
+    });
+    searchInput.addEventListener('focus', (e) => {
+      if (e.target.value.trim()) executeSearch(e.target.value);
+    });
+
     document.addEventListener('click', (e) => {
       const suggestions = document.getElementById('suggestions');
       const foodSearch = document.getElementById('foodSearch');
