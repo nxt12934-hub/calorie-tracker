@@ -267,7 +267,7 @@
     </div>
   </div>
 
-  <!-- 食物資料庫搜尋 (超商 + TFDA + 外部 food.json) -->
+  <!-- 食物資料庫搜尋 -->
   <div class="card">
     <div style="display:flex; justify-content:space-between; align-items:center;">
       <h3 style="margin:0;">🔍 搜尋飲食庫</h3>
@@ -502,7 +502,6 @@
       render();
     }
 
-    // 條碼掃描相機控制
     let html5QrCode = null;
     let isScanning = false;
 
@@ -593,7 +592,7 @@
 
     let lastScannedBarcode = null;
 
-    // AI 拍照辨識 (自動匹配最新可用 Flash 模型)
+    // AI 拍照辨識：嚴格呼叫支援多模態圖片 (Vision) 的模型
     async function handleImage(event) {
       const file = event.target.files[0];
       if (!file) return;
@@ -611,55 +610,58 @@
 
       try {
         const base64 = await resizeImageToBase64(file, 800);
-        let targetModel = 'gemini-2.5-flash';
-
-        try {
-          const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey.trim()}`);
-          if (listRes.ok) {
-            const listData = await listRes.json();
-            const availableFlash = listData.models?.filter(m => 
-              m.supportedGenerationMethods?.includes('generateContent') && 
-              m.name.includes('flash')
-            );
-            if (availableFlash && availableFlash.length > 0) {
-              targetModel = availableFlash[availableFlash.length - 1].name.replace('models/', '');
-            }
-          }
-        } catch (e) {
-          console.warn("無法取得模型清單，使用預設值：", e);
-        }
+        
+        // 嚴格指定支援圖片模態的主流 Flash / Pro 模型
+        const visionModels = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-flash-latest'];
+        let data = null;
+        let lastError = null;
 
         const prompt = `請辨識這張圖片中的食物、飲料或營養標示。若有營養標示請依每份熱量與包裝份數相乘計算總熱量(kcal)與蛋白質(g)；若無標示請估算整份食物數值。必須嚴格回傳標準 JSON 格式，不要加 markdown 或其他字元：{"foodName":"品名","calories":168,"protein":8.2}`;
 
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey.trim()}`;
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{
-              parts: [
-                { text: prompt },
-                { inline_data: { mime_type: "image/jpeg", data: base64 } }
-              ]
-            }]
-          })
-        });
+        for (const model of visionModels) {
+          try {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`;
+            const res = await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{
+                  parts: [
+                    { text: prompt },
+                    { inline_data: { mime_type: "image/jpeg", data: base64 } }
+                  ]
+                }]
+              })
+            });
 
-        const data = await res.json();
-        if (!res.ok || data.error) {
-          throw new Error(data.error ? data.error.message : `HTTP ${res.status}`);
+            const resJson = await res.json();
+            if (res.ok && !resJson.error) {
+              data = resJson;
+              break;
+            } else {
+              lastError = resJson.error ? resJson.error.message : `HTTP ${res.status}`;
+            }
+          } catch (e) {
+            lastError = e.message;
+          }
         }
+
+        if (!data) throw new Error(lastError || '模型無法辨識圖片');
 
         const candidate = data.candidates?.[0];
-        if (!candidate?.content?.parts?.[0]?.text) {
-          throw new Error('AI 回傳格式不符合預期');
+        if (!candidate?.content?.parts?.[0]?.text) throw new Error('AI 回傳格式不符合預期');
+
+        // 安全抽取純 JSON 物件
+        let text = candidate.content.parts[0].text.trim();
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          text = jsonMatch[0];
         }
 
-        const raw = candidate.content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
-        const parsed = JSON.parse(raw);
+        const parsed = JSON.parse(text);
 
         fillForm(parsed.foodName, parsed.calories, parsed.protein);
-        status.innerText = `辨識完成：${parsed.foodName} (使用 ${targetModel})`;
+        status.innerText = `辨識完成：${parsed.foodName}`;
       } catch (e) {
         console.error("辨識詳細錯誤：", e);
         status.innerText = '辨識失敗：' + e.message;
