@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>台灣飲食熱量與營養管理</title>
+  <title>台灣飲食熱量與營養管理 (Gemini 3.8 Flash 三餐版)</title>
   
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -198,12 +198,32 @@
       border: 1px solid #dbeafe;
     }
 
+    /* 三餐分組與小計樣式 */
+    .meal-group {
+      margin-top: 14px;
+      border-top: 1px dashed var(--border);
+      padding-top: 10px;
+    }
+    .meal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+      font-weight: 700;
+      color: #334155;
+      margin-bottom: 6px;
+    }
+    .meal-subtotal {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: normal;
+    }
     ul { list-style: none; padding: 0; margin: 0; }
     li {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 10px 0;
+      padding: 8px 0;
       border-bottom: 1px solid #f1f5f9;
     }
     .delete-btn { background: var(--danger); padding: 4px 8px; font-size: 12px; border-radius: 4px; }
@@ -234,9 +254,9 @@
     </div>
   </div>
 
-  <!-- AI 拍照辨識區塊 -->
+  <!-- AI 拍照辨識區塊 (使用 Gemini 3.8 Flash) -->
   <div class="card">
-    <h3>📸 AI 拍照辨識食物</h3>
+    <h3>📸 AI 拍照辨識食物 (Gemini 3.8 Flash)</h3>
     <div class="camera-wrapper">
       <button class="btn-ai">📷 拍照 / 上傳食物照片辨識</button>
       <input type="file" id="fileInput" accept="image/*" capture="environment" onchange="handleImage(event)">
@@ -245,10 +265,15 @@
     <div id="statusText" style="font-size:12px; color:var(--muted); margin-top:6px; text-align:center;"></div>
     
     <details style="margin-top: 10px;">
-      <summary style="font-size: 12px; color: var(--muted); cursor: pointer;">🔑 設定 Gemini API Key (點此展開)</summary>
+      <summary style="font-size: 12px; color: var(--muted); cursor: pointer;">🔑 設定 API Key 與 GitHub 資料庫 (點此展開)</summary>
       <div style="margin-top: 8px;">
+        <label style="font-size:12px; color:var(--muted);">Gemini API Key：</label>
         <input type="password" id="apiKey" placeholder="貼上 Google Gemini API Key" style="width: 100%; margin-bottom: 6px;">
-        <button style="width: 100%; font-size: 12px; padding: 6px;" onclick="saveKey()">儲存金鑰</button>
+        
+        <label style="font-size:12px; color:var(--muted);">GitHub JSON 資料庫 Raw 網址：</label>
+        <input type="text" id="githubDbUrl" placeholder="https://raw.githubusercontent.com/.../food.json" style="width: 100%; margin-bottom: 6px;">
+        
+        <button style="width: 100%; font-size: 12px; padding: 6px;" onclick="saveConfig()">儲存設定並同步資料庫</button>
       </div>
     </details>
   </div>
@@ -281,13 +306,21 @@
     <div class="quick-chips" id="quickChips"></div>
   </div>
 
-  <!-- 確認加入與新增區塊 -->
+  <!-- 確認加入與新增區塊 (含餐別選擇) -->
   <div class="card">
     <h3>確認加入清單</h3>
     <div class="input-group">
+      <select id="mealTypeSelect" style="max-width: 105px;">
+        <option value="breakfast">早餐</option>
+        <option value="lunch" selected>午餐</option>
+        <option value="dinner">晚餐</option>
+        <option value="snack">點心/加餐</option>
+      </select>
       <input type="text" id="entryName" placeholder="食物名稱">
-      <input type="number" id="entryCal" placeholder="熱量 (kcal)" style="max-width: 90px;">
-      <input type="number" id="entryProtein" placeholder="蛋白質 (g)" style="max-width: 90px;" step="0.1">
+    </div>
+    <div class="input-group">
+      <input type="number" id="entryCal" placeholder="熱量 (kcal)">
+      <input type="number" id="entryProtein" placeholder="蛋白質 (g)" step="0.1">
     </div>
     <button style="width: 100%;" onclick="submitEntry()">確認加入今日清單</button>
   </div>
@@ -360,13 +393,13 @@
     </details>
   </div>
 
-  <!-- 當日明細清單與備份匯出 -->
+  <!-- 當日明細清單與備份匯出 (三餐分組) -->
   <div class="card">
     <div style="display:flex; justify-content:space-between; align-items:center;">
       <h3 style="margin:0;">今日飲食明細</h3>
       <button class="btn-secondary" style="font-size:12px; padding:4px 8px;" onclick="exportToCSV()">📥 匯出 Excel (CSV)</button>
     </div>
-    <ul id="logList" style="margin-top:8px;"></ul>
+    <div id="mealsContainer" style="margin-top:8px;"></div>
   </div>
 
   <script>
@@ -389,18 +422,27 @@
       { type: "TFDA", name: "白米飯", cal: 183, protein: 3.1, per100g: true }
     ];
 
+    // 支援從 GitHub Raw 讀取 JSON 資料庫
     async function loadExternalFoods() {
-      const candidates = ['food.json', 'foods.json'];
-      for (const file of candidates) {
+      const githubUrl = localStorage.getItem('github_db_url');
+      const candidateUrls = [];
+      if (githubUrl) candidateUrls.push(githubUrl);
+      candidateUrls.push('food.json', 'foods.json');
+
+      for (const url of candidateUrls) {
         try {
-          const res = await fetch(file);
+          const res = await fetch(url);
           if (res.ok) {
             const externalFoods = await res.json();
-            defaultDatabase.unshift(...externalFoods);
-            renderQuickChips();
-            break;
+            if (Array.isArray(externalFoods)) {
+              defaultDatabase.unshift(...externalFoods);
+              renderQuickChips();
+              break;
+            }
           }
-        } catch (err) {}
+        } catch (err) {
+          console.warn(`讀取資料庫失敗: ${url}`, err);
+        }
       }
     }
 
@@ -420,6 +462,7 @@
     let currentDate = getTodayString();
     document.getElementById('datePicker').value = currentDate;
     document.getElementById('apiKey').value = localStorage.getItem('gemini_api_key') || '';
+    document.getElementById('githubDbUrl').value = localStorage.getItem('github_db_url') || '';
 
     function loadProfile() {
       const profile = JSON.parse(localStorage.getItem('calorie_user_profile') || '{}');
@@ -592,7 +635,7 @@
 
     let lastScannedBarcode = null;
 
-    // AI 拍照辨識：嚴格呼叫支援多模態圖片 (Vision) 的模型
+    // AI 拍照辨識：指定使用 Gemini 3.8 Flash
     async function handleImage(event) {
       const file = event.target.files[0];
       if (!file) return;
@@ -606,13 +649,13 @@
       document.getElementById('imagePreview').src = URL.createObjectURL(file);
       document.getElementById('imagePreview').style.display = 'block';
       const status = document.getElementById('statusText');
-      status.innerText = '壓縮圖片並由 AI 辨識中...';
+      status.innerText = '圖片處理中，呼叫 Gemini 3.8 Flash 分析...';
 
       try {
         const base64 = await resizeImageToBase64(file, 800);
         
-        // 嚴格指定支援圖片模態的主流 Flash / Pro 模型
-        const visionModels = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-flash-latest'];
+        // 主要使用 gemini-3.8-flash，備援 gemini-2.5-flash
+        const visionModels = ['gemini-3.8-flash', 'gemini-2.5-flash'];
         let data = null;
         let lastError = null;
 
@@ -651,12 +694,9 @@
         const candidate = data.candidates?.[0];
         if (!candidate?.content?.parts?.[0]?.text) throw new Error('AI 回傳格式不符合預期');
 
-        // 安全抽取純 JSON 物件
         let text = candidate.content.parts[0].text.trim();
         const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          text = jsonMatch[0];
-        }
+        if (jsonMatch) text = jsonMatch[0];
 
         const parsed = JSON.parse(text);
 
@@ -774,16 +814,20 @@
       render();
     }
 
-    function saveKey() {
+    function saveConfig() {
       const key = document.getElementById('apiKey').value.trim();
+      const url = document.getElementById('githubDbUrl').value.trim();
       localStorage.setItem('gemini_api_key', key);
-      alert('API Key 已儲存！');
+      localStorage.setItem('github_db_url', url);
+      alert('設定已儲存！');
+      if (url) loadExternalFoods();
     }
 
     function submitEntry() {
       const name = document.getElementById('entryName').value.trim();
       const cal = document.getElementById('entryCal').value;
       const protein = document.getElementById('entryProtein').value;
+      const meal = document.getElementById('mealTypeSelect').value || 'lunch';
       if (!name) return;
 
       if (lastScannedBarcode) {
@@ -795,7 +839,13 @@
 
       const data = getStorage();
       if (!data[currentDate]) data[currentDate] = [];
-      data[currentDate].push({ id: Date.now(), name, cal: Number(cal) || 0, protein: Number(protein) || 0 });
+      data[currentDate].push({
+        id: Date.now(),
+        meal: meal,
+        name,
+        cal: Number(cal) || 0,
+        protein: Number(protein) || 0
+      });
       saveStorage(data);
 
       document.getElementById('entryName').value = '';
@@ -812,26 +862,65 @@
       saveStorage(data);
     }
 
+    // 依三餐分組呈現與小計
     function render() {
       const data = getStorage();
       const logs = data[currentDate] || [];
-      const list = document.getElementById('logList');
-      list.innerHTML = '';
+      const container = document.getElementById('mealsContainer');
+      container.innerHTML = '';
 
+      const mealLabels = {
+        breakfast: "🌅 早餐",
+        lunch: "☀️ 午餐",
+        dinner: "🌙 晚餐",
+        snack: "☕ 點心 / 加餐"
+      };
+
+      const groups = { breakfast: [], lunch: [], dinner: [], snack: [] };
       let totalCal = 0, totalProtein = 0;
+
       logs.forEach(item => {
         totalCal += item.cal;
         totalProtein += item.protein;
-        const li = document.createElement('li');
-        li.innerHTML = `
-          <div>
-            <strong>${item.name}</strong>
-            <div style="font-size:12px; color:var(--muted);">${item.cal} kcal | 蛋白質 ${item.protein} g</div>
-          </div>
-          <button class="delete-btn" onclick="deleteEntry(${item.id})">刪除</button>
-        `;
-        list.appendChild(li);
+        const m = item.meal || 'lunch';
+        if (!groups[m]) groups[m] = [];
+        groups[m].push(item);
       });
+
+      if (logs.length === 0) {
+        container.innerHTML = `<div style="text-align:center; color:var(--muted); font-size:13px; padding:16px;">今日尚無飲食紀錄</div>`;
+      } else {
+        for (const [mealKey, items] of Object.entries(groups)) {
+          if (items.length === 0) continue;
+
+          let mealCal = items.reduce((sum, i) => sum + i.cal, 0);
+          let mealProtein = items.reduce((sum, i) => sum + i.protein, 0);
+
+          const groupDiv = document.createElement('div');
+          groupDiv.className = 'meal-group';
+          groupDiv.innerHTML = `
+            <div class="meal-header">
+              <span>${mealLabels[mealKey] || mealKey}</span>
+              <span class="meal-subtotal">${mealCal} kcal | 蛋 ${mealProtein.toFixed(1)}g</span>
+            </div>
+            <ul id="list-${mealKey}"></ul>
+          `;
+
+          const ul = groupDiv.querySelector('ul');
+          items.forEach(item => {
+            const li = document.createElement('li');
+            li.innerHTML = `
+              <div>
+                <strong>${item.name}</strong>
+                <div style="font-size:12px; color:var(--muted);">${item.cal} kcal | 蛋白質 ${item.protein} g</div>
+              </div>
+              <button class="delete-btn" onclick="deleteEntry(${item.id})">刪除</button>
+            `;
+            ul.appendChild(li);
+          });
+          container.appendChild(groupDiv);
+        }
+      }
 
       const targetCal = Number(localStorage.getItem('calorie_target_cal') || 2000);
       const targetProtein = Number(localStorage.getItem('calorie_target_protein') || 150);
@@ -873,10 +962,12 @@
 
     function exportToCSV() {
       const data = getStorage();
-      let csv = "\uFEFF日期,食物名稱,熱量(kcal),蛋白質(g)\n";
+      const mealMap = { breakfast: "早餐", lunch: "午餐", dinner: "晚餐", snack: "點心" };
+      let csv = "\uFEFF日期,餐別,食物名稱,熱量(kcal),蛋白質(g)\n";
       for (const d in data) {
         data[d].forEach(i => {
-          csv += `${d},"${i.name}",${i.cal},${i.protein}\n`;
+          const mealName = mealMap[i.meal] || "午餐";
+          csv += `${d},${mealName},"${i.name}",${i.cal},${i.protein}\n`;
         });
       }
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
