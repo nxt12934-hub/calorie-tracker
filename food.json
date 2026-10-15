@@ -1,0 +1,198 @@
+[
+  {
+    "type": "早餐",
+    "name": "原味蛋餅 (1份)",
+    "cal": 260,
+    "protein": 10.5,
+    "per100g": false
+  },
+  {
+    "type": "早餐",
+    "name": "起司蛋餅 (1份)",
+    "cal": 310,
+    "protein": 14.0,
+    "per100g": false
+  },
+  {
+    "type": "早餐",
+    "name": "玉米蛋餅 (1份)",
+    "cal": 290,
+    "protein": 11.2,
+    "per100g": false
+  },
+  {
+    "type": "早餐",
+    "name": "火腿蛋餅 (1份)",
+    "cal": 320,
+    "protein": 13.5,
+    "per100g": false
+  },
+  {
+    "type": "早餐",
+    "name": "鮪魚蛋餅 (含沙拉醬/1份)",
+    "cal": 380,
+    "protein": 17.0,
+    "per100g": false
+  },
+  {
+    "type": "早餐",
+    "name": "豬里肌肉排蛋餅 (1份)",
+    "cal": 360,
+    "protein": 21.0,
+    "per100g": false
+  },
+  {
+    "type": "早餐",
+    "name": "煎餃 / 鍋貼 (1份5顆)",
+    "cal": 275,
+    "protein": 8.5,
+    "per100g": false
+  },
+  {
+    "type": "早餐",
+    "name": "蘿蔔糕 (2片不加醬)",
+    "cal": 230,
+    "protein": 4.2,
+    "per100g": false
+  },
+  {
+    "type": "早餐",
+    "name": "蔥抓餅加蛋 (1張)",
+    "cal": 460,
+    "protein": 12.0,
+    "per100g": false
+  },
+  {
+    "type": "早餐",
+    "name": "台式豬肉蛋漢堡 (含美乃滋)",
+    "cal": 420,
+    "protein": 18.0,
+    "per100g": false
+  },
+  {
+    "type": "早餐",
+    "name": "香雞蛋漢堡 (炸雞排)",
+    "cal": 490,
+    "protein": 16.5,
+    "per100g": false
+  },
+  {
+    "type": "早餐",
+    "name": "黑胡椒牛肉蛋漢堡",
+    "cal": 450,
+    "protein": 22.0,
+    "per100g": false
+  },
+  {
+    "type": "早餐",
+    "name": "卡啦雞腿堡 (辣味)",
+    "cal": 560,
+    "protein": 20.0,
+    "per100g": false
+  },
+  {
+    "type": "早餐",
+    "name": "煎肉排蛋吐司 (去邊抹醬)",
+    "cal": 350,
+    "protein": 17.5,
+    "per100g": false
+  },
+  {
+    "type": "早餐",
+    "name": "鮪魚蛋吐司 (含洋蔥沙拉醬)",
+    "cal": 360,
+    "protein": 16.0,
+    "per100g": false
+  },
+  {
+    "type": "早餐",
+    "name": "花生厚片吐司 (抹醬厚片)",
+    "cal": 380,
+    "protein": 9.0,
+    "per100g": false
+  },
+  {
+    "type": "早餐",
+    "name": "大冰奶 / 早餐店冰奶茶 (中杯 500ml)",
+    "cal": 220,
+    "protein": 1.5,
+    "per100g": false
+  },
+  {
+    "type": "早餐",
+    "name": "無糖豆漿 (中杯 500ml)",
+    "cal": 150,
+    "protein": 14.0,
+    "per100g": false
+  },
+  {
+    "type": "早餐",
+    "name": "有糖豆漿 (中杯 500ml)",
+    "cal": 260,
+    "protein": 13.5,
+    "per100g": false
+  },
+  {
+    "type": "早餐",
+    "name": "熱狗 (1包3小根)",
+    "cal": 160,
+    "protein": 6.5,
+    "per100g": false
+  },
+  {
+    "type": "火鍋",
+    "name": "火鍋低脂板腱牛 (每100g)",
+    "cal": 160,
+    "protein": 22.0,
+    "per100g": true
+  },
+  {
+    "type": "火鍋",
+    "name": "火鍋牛胸腹/牛五花 (每100g)",
+    "cal": 330,
+    "protein": 15.0,
+    "per100g": true
+  },
+  {
+    "type": "火鍋",
+    "name": "火鍋豬梅花肉盤 (每100g)",
+    "cal": 210,
+    "protein": 19.0,
+    "per100g": true
+  },
+  {
+    "type": "火鍋",
+    "name": "火鍋豬五花肉盤 (每100g)",
+    "cal": 368,
+    "protein": 14.5,
+    "per100g": true
+  },
+  {
+    "type": "火鍋",
+    "name": "火鍋去骨雞腿肉盤 (每100g)",
+    "cal": 198,
+    "protein": 17.5,
+    "per100g": true
+  },
+  {
+    "type": "火鍋",
+    "name": "火鍋白蝦 / 草蝦 (每100g約5-6隻)",
+    "cal": 100,
+    "protein": 22.0,
+    "per100g": true
+  },
+  {
+    "type": "火鍋",
+    "name": "火鍋鯛魚片切盤 (每100g)",
+    "cal": 110,
+    "protein": 20.0,
+    "per100g": true
+  },
+  {
+    "type": "火鍋",
+    "name": "蛤蜊 (每100g含殼重)",
+    "cal": 35,
+    "protein": 5.0,
+    "per100g": true
+  },
+  {
