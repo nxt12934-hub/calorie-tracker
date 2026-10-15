@@ -306,4 +306,642 @@
     </details>
   </div>
 
-  <!-- 條碼掃描功能區塊
+  <!-- 條碼掃描功能區塊 -->
+  <div class="card">
+    <h3>📷 條碼掃描辨識 (超商包裝)</h3>
+    <button class="btn-barcode" id="startScanBtn" onclick="toggleScanner()">
+      <span>⚡ 開啟相機掃描條碼</span>
+    </button>
+    <button class="btn-stop" id="stopScanBtn" onclick="stopScanner()">關閉鏡頭</button>
+    
+    <div id="reader"></div>
+    <div id="scanStatus" style="font-size:12px; color:var(--muted); margin-top:8px; text-align:center;">
+      點擊按鈕開啟鏡頭，對準超商鮮食或飲料的一維條碼 (EAN-13)
+    </div>
+  </div>
+
+  <!-- AI 拍照辨識區塊 -->
+  <div class="card">
+    <details>
+      <summary style="font-weight: 600; cursor: pointer; color: #475569;">📸 AI 拍照辨識食物 (Gemini API)</summary>
+      <div style="margin-top: 10px;">
+        <input type="password" id="apiKey" placeholder="貼上 Google Gemini API Key" style="width: 100%; margin-bottom: 8px;">
+        <button style="width: 100%; font-size: 13px; margin-bottom: 8px;" onclick="saveKey()">儲存金鑰至手機</button>
+        <div class="camera-wrapper">
+          <button class="btn-ai">📷 拍照 / 上傳食物照片辨識</button>
+          <input type="file" id="fileInput" accept="image/*" capture="environment" onchange="handleImage(event)">
+        </div>
+        <img id="imagePreview" class="preview-img" alt="預覽照片">
+        <div id="statusText" style="font-size:12px; color:var(--muted); margin-top:6px; text-align:center;"></div>
+      </div>
+    </details>
+  </div>
+
+  <!-- 食物資料庫搜尋 (超商 + TFDA + 外部 food.json) -->
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h3 style="margin:0;">🔍 搜尋飲食庫</h3>
+      <span style="font-size:12px; color:var(--muted);" id="dbCountText"></span>
+    </div>
+    <div class="search-wrapper" style="margin-top:8px;">
+      <input type="text" id="foodSearch" placeholder="搜尋 7-11、全家、小吃、地瓜、雞胸肉..." oninput="handleSearch()">
+      <div id="suggestions" class="suggestions"></div>
+    </div>
+    <div style="font-size: 12px; color: var(--muted);">常用快選：</div>
+    <div class="quick-chips" id="quickChips"></div>
+  </div>
+
+  <!-- 確認加入與新增區塊 -->
+  <div class="card">
+    <h3>確認加入清單</h3>
+    <div class="input-group">
+      <input type="text" id="entryName" placeholder="食物名稱">
+      <input type="number" id="entryCal" placeholder="熱量 (kcal)" style="max-width: 90px;">
+      <input type="number" id="entryProtein" placeholder="蛋白質 (g)" style="max-width: 90px;" step="0.1">
+    </div>
+    <button style="width: 100%;" onclick="submitEntry()">確認加入今日清單</button>
+  </div>
+
+  <!-- 當日明細清單與備份匯出 -->
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h3 style="margin:0;">今日飲食明細</h3>
+      <button class="btn-secondary" style="font-size:12px; padding:4px 8px;" onclick="exportToCSV()">📥 匯出 Excel (CSV)</button>
+    </div>
+    <ul id="logList" style="margin-top:8px;"></ul>
+  </div>
+
+  <script>
+    // 預設內建資料庫
+    let defaultDatabase = [
+      // 常用超商條碼商品
+      { barcode: "4710088430930", type: "7-11", name: "統一無糖高纖豆漿 (450ml)", cal: 161, protein: 15.3, per100g: false },
+      { barcode: "4710088430923", type: "7-11", name: "統一低糖高纖豆漿 (450ml)", cal: 189, protein: 15.3, per100g: false },
+      { barcode: "4710018131333", type: "全家", name: "光泉濃豆漿無加糖 (375ml)", cal: 191, protein: 19.1, per100g: false },
+      { barcode: "4710018131449", type: "全家", name: "光泉黑豆漿無加糖 (375ml)", cal: 175, protein: 15.8, per100g: false },
+      { barcode: "4710174099416", type: "7-11", name: "大成 經典法式舒肥雞胸肉", cal: 135, protein: 23.5, per100g: false },
+      { barcode: "4710174099423", type: "全家", name: "大成 迷迭香舒肥雞胸肉", cal: 128, protein: 23.0, per100g: false },
+      { barcode: "4710088431104", type: "7-11", name: "Dr. Milker 極鮮乳 (250ml)", cal: 165, protein: 7.8, per100g: false },
+      
+      // 7-ELEVEN 常用鮮食
+      { type: "7-11", name: "卜蜂 義式黑椒雞胸肉", cal: 125, protein: 22.0, per100g: false },
+      { type: "7-11", name: "21Plus 椒麻烤雞胸肉", cal: 140, protein: 23.0, per100g: false },
+      { type: "7-11", name: "茶葉蛋 (1顆)", cal: 75, protein: 7.0, per100g: false },
+      { type: "7-11", name: "石安牧場溫泉蛋 (2入)", cal: 132, protein: 12.2, per100g: false },
+      { type: "7-11", name: "現蒸地瓜 (約150g)", cal: 190, protein: 2.0, per100g: false },
+      { type: "7-11", name: "紐奧良風味烤雞三明治", cal: 285, protein: 12.5, per100g: false },
+      { type: "7-11", name: "起司三重奏三明治", cal: 320, protein: 10.0, per100g: false },
+      { type: "7-11", name: "鮪魚御飯糰", cal: 228, protein: 5.6, per100g: false },
+      { type: "7-11", name: "金沙烤豆腐溫沙拉", cal: 188, protein: 11.2, per100g: false },
+      { type: "7-11", name: "一日野菜 活力彩蔬沙拉", cal: 35, protein: 1.5, per100g: false },
+      { type: "7-11", name: "爪哇咖哩飯", cal: 710, protein: 16.5, per100g: false },
+      { type: "7-11", name: "真飽 經典排骨便當", cal: 885, protein: 31.0, per100g: false },
+      { type: "7-11", name: "真飽 原味麻醬涼麵", cal: 645, protein: 15.0, per100g: false },
+      { type: "7-11", name: "帕瑪森肉醬義大利麵", cal: 520, protein: 19.5, per100g: false },
+
+      // 全家 FamilyMart 常用鮮食
+      { type: "全家", name: "卜蜂 鹽蔥雞胸肉", cal: 130, protein: 22.5, per100g: false },
+      { type: "全家", name: "健身G肉餐盒", cal: 445, protein: 30.5, per100g: false },
+      { type: "全家", name: "香草烤雞腿薑黃飯椒麻餐盒", cal: 480, protein: 26.0, per100g: false },
+      { type: "全家", name: "茶葉蛋 (1顆)", cal: 76, protein: 7.1, per100g: false },
+      { type: "全家", name: "夯番薯 (約150g)", cal: 195, protein: 2.1, per100g: false },
+      { type: "全家", name: "烤多汁雞腿排 (熟食保溫櫃)", cal: 215, protein: 18.2, per100g: false },
+      { type: "全家", name: "大口 經典烤雞握飯糰", cal: 395, protein: 14.5, per100g: false },
+      { type: "全家", name: "金咖哩 濃辛牛肉咖哩飯", cal: 725, protein: 18.0, per100g: false },
+      { type: "全家", name: "義式番茄嫩豆腐蔬菜湯", cal: 110, protein: 6.2, per100g: false },
+      { type: "全家", name: "凱薩雞肉沙拉", cal: 165, protein: 9.8, per100g: false },
+
+      // 台式外食與小吃
+      { type: "小吃", name: "台式滷肉飯 (中碗約200g)", cal: 440, protein: 11.0, per100g: false },
+      { type: "小吃", name: "台式炸排骨便當 (整份)", cal: 850, protein: 32.0, per100g: false },
+      { type: "小吃", name: "台式炸雞腿便當 (整份)", cal: 920, protein: 38.0, per100g: false },
+      { type: "小吃", name: "紅燒牛肉麵 (含湯麵肉)", cal: 680, protein: 35.0, per100g: false },
+      { type: "小吃", name: "八方雲集 招牌鍋貼 (1顆)", cal: 68, protein: 2.4, per100g: false },
+      { type: "小吃", name: "早餐店 原味蛋餅 (1份)", cal: 260, protein: 10.5, per100g: false },
+
+      // TFDA 衛福部原型食材庫 (每 100g 基準)
+      { type: "TFDA", name: "去皮雞胸肉", cal: 109, protein: 24.2, per100g: true },
+      { type: "TFDA", name: "雞里肌肉", cal: 106, protein: 24.0, per100g: true },
+      { type: "TFDA", name: "去骨雞腿肉 (含皮)", cal: 198, protein: 17.5, per100g: true },
+      { type: "TFDA", name: "牛腱 / 牛後腿肉", cal: 122, protein: 21.8, per100g: true },
+      { type: "TFDA", name: "板腱低脂牛肉", cal: 160, protein: 22.0, per100g: true },
+      { type: "TFDA", name: "豬里肌肉", cal: 180, protein: 22.2, per100g: true },
+      { type: "TFDA", name: "白蝦仁 / 草蝦", cal: 100, protein: 22.0, per100g: true },
+      { type: "TFDA", name: "鮭魚切片", cal: 215, protein: 20.5, per100g: true },
+      { type: "TFDA", name: "白米飯", cal: 183, protein: 3.1, per100g: true },
+      { type: "TFDA", name: "地瓜 (黃肉甘藷)", cal: 114, protein: 1.4, per100g: true },
+      { type: "TFDA", name: "大燕麥片", cal: 406, protein: 11.0, per100g: true },
+      { type: "TFDA", name: "傳統豆腐 (北豆腐)", cal: 86, protein: 8.5, per100g: true },
+      { type: "TFDA", name: "水煮蛋 / 生雞蛋", cal: 144, protein: 12.8, per100g: true }
+    ];
+
+    // 非同步載入 food.json
+    async function loadExternalFoods() {
+      const candidates = ['food.json', 'foods.json'];
+      for (const file of candidates) {
+        try {
+          const res = await fetch(file);
+          if (res.ok) {
+            const externalFoods = await res.json();
+            defaultDatabase.unshift(...externalFoods);
+            renderQuickChips();
+            console.log(`成功載入 ${file}，新增了 ${externalFoods.length} 筆資料！`);
+            break;
+          }
+        } catch (err) {}
+      }
+    }
+
+    function getFullDatabase() {
+      const customBarcodes = JSON.parse(localStorage.getItem('calorie_custom_barcodes') || '[]');
+      return [...customBarcodes, ...defaultDatabase];
+    }
+
+    let currentDate = new Date().toISOString().split('T')[0];
+    document.getElementById('datePicker').value = currentDate;
+    document.getElementById('apiKey').value = localStorage.getItem('gemini_api_key') || '';
+
+    // TDEE 個人設定與計算
+    function loadProfile() {
+      const profile = JSON.parse(localStorage.getItem('calorie_user_profile') || '{}');
+      if (profile.gender) document.getElementById('userGender').value = profile.gender;
+      if (profile.age) document.getElementById('userAge').value = profile.age;
+      if (profile.height) document.getElementById('userHeight').value = profile.height;
+      if (profile.weight) document.getElementById('userWeight').value = profile.weight;
+      if (profile.activity) document.getElementById('userActivity').value = profile.activity;
+      if (profile.goal) document.getElementById('userGoal').value = profile.goal;
+
+      const targetCal = localStorage.getItem('calorie_target_cal') || '2000';
+      const targetProtein = localStorage.getItem('calorie_target_protein') || '150';
+      document.getElementById('targetCalInput').value = targetCal;
+      document.getElementById('targetProteinInput').value = targetProtein;
+      document.getElementById('targetCalDisplay').innerText = targetCal;
+      document.getElementById('targetProteinDisplay').innerText = targetProtein;
+
+      if (profile.weight && profile.height && profile.age) calculateTDEE();
+    }
+
+    function calculateTDEE() {
+      const gender = document.getElementById('userGender').value;
+      const age = Number(document.getElementById('userAge').value);
+      const height = Number(document.getElementById('userHeight').value);
+      const weight = Number(document.getElementById('userWeight').value);
+      const activity = Number(document.getElementById('userActivity').value);
+      const goal = document.getElementById('userGoal').value;
+
+      if (!age || !height || !weight) return null;
+
+      let bmr = (10 * weight) + (6.25 * height) - (5 * age);
+      bmr += (gender === 'male' ? 5 : -161);
+
+      const tdee = Math.round(bmr * activity);
+      let recCal = tdee;
+      if (goal === 'cut') recCal = tdee - 400;
+      else if (goal === 'bulk') recCal = tdee + 300;
+
+      const recProtein = Math.round(weight * 1.8);
+
+      document.getElementById('bmrDisplay').innerText = Math.round(bmr);
+      document.getElementById('tdeeDisplay').innerText = tdee;
+      document.getElementById('recCalDisplay').innerText = recCal;
+
+      return { bmr, tdee, recCal, recProtein, gender, age, height, weight, activity, goal };
+    }
+
+    function calculateAndSaveProfile() {
+      const res = calculateTDEE();
+      if (!res) {
+        alert('請先完整填寫性別、年齡、身高與體重！');
+        return;
+      }
+      localStorage.setItem('calorie_user_profile', JSON.stringify({
+        gender: res.gender, age: res.age, height: res.height, weight: res.weight, activity: res.activity, goal: res.goal
+      }));
+      localStorage.setItem('calorie_target_cal', res.recCal);
+      localStorage.setItem('calorie_target_protein', res.recProtein);
+
+      document.getElementById('targetCalInput').value = res.recCal;
+      document.getElementById('targetProteinInput').value = res.recProtein;
+      document.getElementById('targetCalDisplay').innerText = res.recCal;
+      document.getElementById('targetProteinDisplay').innerText = res.recProtein;
+      alert(`已成功設定每日目標熱量為 ${res.recCal} kcal，蛋白質為 ${res.recProtein} g。`);
+      render();
+    }
+
+    function saveCustomTargets() {
+      const cal = document.getElementById('targetCalInput').value;
+      const protein = document.getElementById('targetProteinInput').value;
+      if (cal) {
+        localStorage.setItem('calorie_target_cal', cal);
+        document.getElementById('targetCalDisplay').innerText = cal;
+      }
+      if (protein) {
+        localStorage.setItem('calorie_target_protein', protein);
+        document.getElementById('targetProteinDisplay').innerText = protein;
+      }
+      alert('已更新自訂目標！');
+      render();
+    }
+
+    // 條碼掃描相機控制
+    let html5QrCode = null;
+    let isScanning = false;
+
+    function toggleScanner() {
+      if (isScanning) stopScanner();
+      else startScanner();
+    }
+
+    async function startScanner() {
+      const readerDiv = document.getElementById('reader');
+      const status = document.getElementById('scanStatus');
+      const startBtn = document.getElementById('startScanBtn');
+      const stopBtn = document.getElementById('stopScanBtn');
+
+      readerDiv.style.display = 'block';
+      startBtn.style.display = 'none';
+      stopBtn.style.display = 'block';
+      status.innerText = '正在開啟相機...請對準條碼';
+
+      html5QrCode = new Html5Qrcode("reader");
+      const config = { fps: 10, qrbox: { width: 280, height: 160 }, aspectRatio: 1.0 };
+
+      try {
+        await html5QrCode.start(
+          { facingMode: "environment" },
+          config,
+          onScanSuccess,
+          (err) => {}
+        );
+        isScanning = true;
+        status.innerText = '對準超商條碼即可自動辨識...';
+      } catch (err) {
+        console.error(err);
+        status.innerText = '無法啟動相機：請確認網址為 HTTPS 且已允許瀏覽器相機權限。';
+        stopScanner();
+      }
+    }
+
+    async function stopScanner() {
+      if (html5QrCode && isScanning) {
+        try {
+          await html5QrCode.stop();
+          html5QrCode.clear();
+        } catch (e) {}
+      }
+      isScanning = false;
+      document.getElementById('reader').style.display = 'none';
+      document.getElementById('startScanBtn').style.display = 'block';
+      document.getElementById('stopScanBtn').style.display = 'none';
+    }
+
+    async function onScanSuccess(decodedText) {
+      const status = document.getElementById('scanStatus');
+      status.innerHTML = `掃描成功！條碼：<strong style="color:var(--primary);">${decodedText}</strong>`;
+      if (navigator.vibrate) navigator.vibrate(80);
+
+      const db = getFullDatabase();
+      const matched = db.find(item => item.barcode === decodedText);
+      if (matched) {
+        fillForm(matched.name, matched.cal, matched.protein);
+        status.innerText = `找到商品：${matched.name} (${matched.cal} kcal)`;
+        stopScanner();
+        return;
+      }
+
+      status.innerText = `正在連線 Open Food Facts 全球資料庫查詢...`;
+      try {
+        const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${decodedText}.json`);
+        const json = await res.json();
+        if (json.status === 1 && json.product) {
+          const p = json.product;
+          const name = p.product_name || p.product_name_zh || "超商食品";
+          const nutriments = p.nutriments || {};
+          const cal = Math.round(nutriments['energy-kcal_serving'] || nutriments['energy-kcal_100g'] || 0);
+          const protein = Math.round((nutriments['proteins_serving'] || nutriments['proteins_100g'] || 0) * 10) / 10;
+          fillForm(`${name} [條碼]`, cal, protein);
+          status.innerText = `線上比對成功：${name}`;
+        } else {
+          status.innerText = `未收錄此條碼，請手動輸入名稱與熱量，系統將自動為您記住！`;
+          fillForm(`條碼商品 (${decodedText})`, '', '');
+          lastScannedBarcode = decodedText;
+        }
+      } catch (err) {
+        fillForm(`條碼商品 (${decodedText})`, '', '');
+        lastScannedBarcode = decodedText;
+      }
+      stopScanner();
+    }
+
+    let lastScannedBarcode = null;
+
+    // AI 拍照辨識食物 (指定 gemini-3.5-flash，含自動容錯切換)
+    async function handleImage(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const apiKey = localStorage.getItem('gemini_api_key');
+      if (!apiKey) {
+        alert('請先在下方展開設定並填入 Google Gemini API Key！');
+        return;
+      }
+
+      document.getElementById('imagePreview').src = URL.createObjectURL(file);
+      document.getElementById('imagePreview').style.display = 'block';
+      const status = document.getElementById('statusText');
+      status.innerText = '壓縮圖片並由 AI 辨識中...';
+
+      try {
+        const base64 = await resizeImageToBase64(file, 800);
+        
+        // 優先呼叫 gemini-3.5-flash，備援 gemini-2.5-flash
+        const models = ['gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-2.0-flash'];
+        let data = null;
+        let lastError = null;
+
+        const prompt = `請辨識這張圖片中的食物、飲料或營養標示。若有營養標示請依標示計算總熱量與蛋白質；若無標示請優先參考台灣超商或外食估算整份熱量(kcal)與蛋白質(g)。必須嚴格回傳標準 JSON 格式，不要加 markdown 或任何額外字元：{"foodName":"品名","calories":168,"protein":8.2}`;
+
+        for (const model of models) {
+          try {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`;
+            const res = await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{
+                  parts: [
+                    { text: prompt },
+                    { inline_data: { mime_type: "image/jpeg", data: base64 } }
+                  ]
+                }]
+              })
+            });
+
+            const resJson = await res.json();
+            if (res.ok && !resJson.error) {
+              data = resJson;
+              break;
+            } else {
+              lastError = resJson.error ? resJson.error.message : `HTTP ${res.status}`;
+            }
+          } catch (e) {
+            lastError = e.message;
+          }
+        }
+
+        if (!data) {
+          throw new Error(lastError || '模型無回應');
+        }
+
+        const candidate = data.candidates?.[0];
+        if (!candidate?.content?.parts?.[0]?.text) {
+          throw new Error('AI 回傳格式不符合預期');
+        }
+
+        const raw = candidate.content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
+        const parsed = JSON.parse(raw);
+
+        fillForm(parsed.foodName, parsed.calories, parsed.protein);
+        status.innerText = `辨識完成：${parsed.foodName}`;
+      } catch (e) {
+        console.error("辨識詳細錯誤：", e);
+        status.innerText = '辨識失敗：' + e.message;
+      }
+    }
+
+    function resizeImageToBase64(file, maxWidth) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let w = img.width, h = img.height;
+            if (w > maxWidth) { h = (maxWidth / w) * h; w = maxWidth; }
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL('image/jpeg', 0.8).split(',')[1]);
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // 搜尋與快選標籤
+    function renderQuickChips() {
+      const container = document.getElementById('quickChips');
+      const popular = [
+        defaultDatabase[4], // 7-11 雞胸
+        defaultDatabase[0], // 7-11 豆漿
+        defaultDatabase[9], // 茶葉蛋
+        defaultDatabase[11], // 地瓜
+        defaultDatabase[22], // 全家 健身餐盒
+        defaultDatabase[37]  // TFDA 去皮雞胸肉
+      ].filter(Boolean);
+
+      container.innerHTML = '';
+      popular.forEach(item => {
+        const chip = document.createElement('div');
+        chip.className = 'chip';
+        chip.innerText = item.name.replace(/.*-11\s|全家\s/, '');
+        chip.onclick = () => selectItem(item);
+        container.appendChild(chip);
+      });
+      document.getElementById('dbCountText').innerText = `收錄 ${getFullDatabase().length} 筆食品`;
+    }
+
+    function handleSearch() {
+      const q = document.getElementById('foodSearch').value.trim().toLowerCase();
+      const suggestions = document.getElementById('suggestions');
+      if (!q) { suggestions.style.display = 'none'; return; }
+
+      const db = getFullDatabase();
+      const matches = db.filter(f => f.name.toLowerCase().includes(q) || f.type.toLowerCase().includes(q) || (f.barcode && f.barcode.includes(q)));
+      if (matches.length === 0) { suggestions.style.display = 'none'; return; }
+
+      suggestions.innerHTML = '';
+      matches.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'suggestion-item';
+        let badgeClass = 'badge-food';
+        if (item.type === 'TFDA') badgeClass = 'badge-tfda';
+        else if (item.type === '7-11') badgeClass = 'badge-711';
+        else if (item.type === '全家') badgeClass = 'badge-family';
+
+        const unitText = item.per100g ? "/100g" : "";
+        div.innerHTML = `
+          <span><span class="badge ${badgeClass}">${item.type}</span>${item.name}</span>
+          <span style="color:var(--muted);">${item.cal} kcal | 蛋 ${item.protein}g ${unitText}</span>
+        `;
+        div.onclick = () => {
+          selectItem(item);
+          suggestions.style.display = 'none';
+          document.getElementById('foodSearch').value = '';
+        };
+        suggestions.appendChild(div);
+      });
+      suggestions.style.display = 'block';
+    }
+
+    function selectItem(item) {
+      if (item.per100g) {
+        const grams = prompt(`「${item.name}」基準為每 100g。\n請輸入實際食用克數 (g)：`, "100");
+        if (grams && !isNaN(grams) && Number(grams) > 0) {
+          const ratio = Number(grams) / 100;
+          fillForm(
+            `${item.name} (${grams}g)`,
+            Math.round(item.cal * ratio),
+            Math.round(item.protein * ratio * 10) / 10
+          );
+          return;
+        }
+      }
+      fillForm(item.name, item.cal, item.protein);
+    }
+
+    function fillForm(name, cal, protein) {
+      document.getElementById('entryName').value = name;
+      document.getElementById('entryCal').value = cal;
+      document.getElementById('entryProtein').value = protein;
+    }
+
+    // 儲存與日常紀錄
+    function getStorage() {
+      return JSON.parse(localStorage.getItem('calorie_tracker_data') || '{}');
+    }
+
+    function saveStorage(data) {
+      localStorage.setItem('calorie_tracker_data', JSON.stringify(data));
+      render();
+    }
+
+    function saveKey() {
+      const key = document.getElementById('apiKey').value.trim();
+      localStorage.setItem('gemini_api_key', key);
+      alert('API Key 已儲存！');
+    }
+
+    function submitEntry() {
+      const name = document.getElementById('entryName').value.trim();
+      const cal = document.getElementById('entryCal').value;
+      const protein = document.getElementById('entryProtein').value;
+      if (!name) return;
+
+      if (lastScannedBarcode) {
+        const custom = JSON.parse(localStorage.getItem('calorie_custom_barcodes') || '[]');
+        custom.push({ barcode: lastScannedBarcode, type: "自訂", name, cal: Number(cal) || 0, protein: Number(protein) || 0 });
+        localStorage.setItem('calorie_custom_barcodes', JSON.stringify(custom));
+        lastScannedBarcode = null;
+      }
+
+      const data = getStorage();
+      if (!data[currentDate]) data[currentDate] = [];
+      data[currentDate].push({ id: Date.now(), name, cal: Number(cal) || 0, protein: Number(protein) || 0 });
+      saveStorage(data);
+
+      document.getElementById('entryName').value = '';
+      document.getElementById('entryCal').value = '';
+      document.getElementById('entryProtein').value = '';
+      document.getElementById('imagePreview').style.display = 'none';
+      document.getElementById('statusText').innerText = '';
+    }
+
+    function deleteEntry(id) {
+      const data = getStorage();
+      if (!data[currentDate]) return;
+      data[currentDate] = data[currentDate].filter(item => item.id !== id);
+      saveStorage(data);
+    }
+
+    // 畫面動態渲染與超標回饋
+    function render() {
+      const data = getStorage();
+      const logs = data[currentDate] || [];
+      const list = document.getElementById('logList');
+      list.innerHTML = '';
+
+      let totalCal = 0, totalProtein = 0;
+      logs.forEach(item => {
+        totalCal += item.cal;
+        totalProtein += item.protein;
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <div>
+            <strong>${item.name}</strong>
+            <div style="font-size:12px; color:var(--muted);">${item.cal} kcal | 蛋白質 ${item.protein} g</div>
+          </div>
+          <button class="delete-btn" onclick="deleteEntry(${item.id})">刪除</button>
+        `;
+        list.appendChild(li);
+      });
+
+      const targetCal = Number(localStorage.getItem('calorie_target_cal') || 2000);
+      const targetProtein = Number(localStorage.getItem('calorie_target_protein') || 150);
+
+      document.getElementById('totalCal').innerText = totalCal;
+      document.getElementById('totalProtein').innerText = totalProtein.toFixed(1);
+
+      const remainingCal = targetCal - totalCal;
+      const calPercent = (totalCal / targetCal) * 100;
+      const calFill = document.getElementById('calFill');
+      const calAlert = document.getElementById('calAlert');
+      const calRemainText = document.getElementById('calRemainingText');
+
+      calFill.style.width = Math.min(calPercent, 100) + '%';
+
+      if (totalCal >= targetCal) {
+        calFill.style.backgroundColor = 'var(--danger)';
+        calAlert.className = 'alert-banner alert-danger';
+        calAlert.innerText = `⚠️ 已超過每日熱量目標 ${Math.abs(remainingCal)} kcal！`;
+        calRemainText.innerHTML = `<span style="color:var(--danger); font-weight:bold;">超標 ${Math.abs(remainingCal)} kcal</span>`;
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+      } else if (calPercent >= 90) {
+        calFill.style.backgroundColor = 'var(--warning)';
+        calAlert.className = 'alert-banner alert-warning';
+        calAlert.innerText = `⚡ 熱量即將達標！僅剩餘 ${remainingCal} kcal 額度。`;
+        calRemainText.innerText = `剩餘 ${remainingCal} kcal`;
+      } else {
+        calFill.style.backgroundColor = 'var(--primary)';
+        calAlert.className = 'alert-banner';
+        calAlert.style.display = 'none';
+        calRemainText.innerText = `剩餘 ${remainingCal} kcal`;
+      }
+
+      const proteinPercent = (totalProtein / targetProtein) * 100;
+      document.getElementById('proteinFill').style.width = Math.min(proteinPercent, 100) + '%';
+      const remainingProtein = (targetProtein - totalProtein).toFixed(1);
+      document.getElementById('proteinRemainingText').innerText = remainingProtein > 0 ? `剩餘 ${remainingProtein} g` : `已達標！`;
+    }
+
+    // 匯出 CSV 備份
+    function exportToCSV() {
+      const data = getStorage();
+      let csv = "\uFEFF日期,食物名稱,熱量(kcal),蛋白質(g)\n";
+      for (const d in data) {
+        data[d].forEach(i => {
+          csv += `${d},"${i.name}",${i.cal},${i.protein}\n`;
+        });
+      }
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `熱量飲食紀錄備份_${currentDate}.csv`;
+      a.click();
+    }
+
+    document.getElementById('datePicker').addEventListener('change', (e) => {
+      currentDate = e.target.value;
+      render();
+    });
+
+    // 依序初始化
+    loadExternalFoods();
+    loadProfile();
+    renderQuickChips();
+    render();
+  </script>
+</body>
+</html>
