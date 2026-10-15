@@ -46,6 +46,7 @@
       padding: 16px;
       margin-bottom: 16px;
       box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      position: relative;
     }
     h2, h3 { margin-top: 0; }
     .progress-bar {
@@ -150,19 +151,23 @@
     .alert-warning { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; display: block; }
     .alert-danger { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; display: block; }
 
-    .search-wrapper { position: relative; margin-bottom: 8px; }
+    /* 搜尋框與浮動選單核心樣式 */
+    .search-wrapper { 
+      position: relative; 
+      width: 100%; 
+    }
     .suggestions {
       position: absolute;
       left: 0;
       right: 0;
-      top: 100%;
-      background: #fff;
+      top: calc(100% + 4px);
+      background: #ffffff;
       border: 1px solid var(--border);
       border-radius: 8px;
-      max-height: 260px;
+      max-height: 280px;
       overflow-y: auto;
-      z-index: 20;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+      z-index: 100;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
       display: none;
     }
     .suggestion-item {
@@ -173,6 +178,9 @@
       justify-content: space-between;
       align-items: center;
       font-size: 13px;
+    }
+    .suggestion-item:active, .suggestion-item:hover {
+      background-color: #f8fafc;
     }
     .badge {
       font-size: 11px;
@@ -292,17 +300,17 @@
     </div>
   </div>
 
-  <!-- 食物資料庫搜尋 -->
+  <!-- 食物資料庫搜尋 (已修復結構與浮動選單) -->
   <div class="card">
     <div style="display:flex; justify-content:space-between; align-items:center;">
       <h3 style="margin:0;">🔍 搜尋飲食庫</h3>
-      <span style="font-size:12px; color:var(--muted);" id="dbCountText"></span>
+      <span style="font-size:12px; color:var(--muted);" id="dbCountText">收錄 0 筆食品</span>
     </div>
     <div class="search-wrapper" style="margin-top:8px;">
-      <input type="text" id="foodSearch" placeholder="搜尋 7-11、全家、小吃、地瓜、雞胸肉..." oninput="handleSearch()">
+      <input type="text" id="foodSearch" placeholder="搜尋 7-11、全家、小吃、地瓜、雞胸肉..." oninput="handleSearch()" autocomplete="off">
       <div id="suggestions" class="suggestions"></div>
     </div>
-    <div style="font-size: 12px; color: var(--muted);">常用快選：</div>
+    <div style="font-size: 12px; color: var(--muted); margin-top:8px;">常用快選：</div>
     <div class="quick-chips" id="quickChips"></div>
   </div>
 
@@ -404,16 +412,19 @@
 
   <script>
     let defaultDatabase = [
-      { barcode: "4710088430930", type: "7-11", name: "統一無糖高纖豆漿 (450ml)", cal: 161, protein: 15.3, per100g: false },
-      { barcode: "4710088430923", type: "7-11", name: "統一低糖高纖豆漿 (450ml)", cal: 189, protein: 15.3, per100g: false },
-      { barcode: "4710018131333", type: "全家", name: "光泉濃豆漿無加糖 (375ml)", cal: 191, protein: 19.1, per100g: false },
-      { barcode: "4710018131449", type: "全家", name: "光泉黑豆漿無加糖 (375ml)", cal: 175, protein: 15.8, per100g: false },
-      { barcode: "4710174099416", type: "7-11", name: "大成 經典法式舒肥雞胸肉", cal: 135, protein: 23.5, per100g: false },
-      { barcode: "4710174099423", type: "全家", name: "大成 迷迭香舒肥雞胸肉", cal: 128, protein: 23.0, per100g: false },
-      { barcode: "4710088431104", type: "7-11", name: "Dr. Milker 極鮮乳 (250ml)", cal: 165, protein: 7.8, per100g: false },
+      { barcode: "4710088430930", type: "7-11", name: "統一無糖高纖豆漿 450ml", cal: 161, protein: 15.3, per100g: false },
+      { barcode: "4710088430923", type: "7-11", name: "統一低糖高纖豆漿 450ml", cal: 189, protein: 15.3, per100g: false },
+      { barcode: "4710018131333", type: "全家", name: "光泉濃豆漿無加糖 375ml", cal: 191, protein: 19.1, per100g: false },
+      { barcode: "4710018131449", type: "全家", name: "光泉黑豆漿無加糖 375ml", cal: 175, protein: 15.8, per100g: false },
+      { barcode: "4710174099416", type: "7-11", name: "大成經典法式舒肥雞胸肉", cal: 135, protein: 23.5, per100g: false },
+      { barcode: "4710174099423", type: "全家", name: "大成迷迭香舒肥雞胸肉", cal: 128, protein: 23.0, per100g: false },
+      { barcode: "4710088431104", type: "7-11", name: "Dr. Milker 極鮮乳 250ml", cal: 165, protein: 7.8, per100g: false },
       { type: "7-11", name: "茶葉蛋 (1顆)", cal: 75, protein: 7.0, per100g: false },
       { type: "7-11", name: "現蒸地瓜 (約150g)", cal: 190, protein: 2.0, per100g: false },
       { type: "7-11", name: "紐奧良風味烤雞三明治", cal: 285, protein: 12.5, per100g: false },
+      { type: "7-11", name: "真飽涼麵 原味麻醬", cal: 665, protein: 16.8, per100g: false },
+      { type: "7-11", name: "真飽涼麵 香辣麻醬", cal: 678, protein: 17.1, per100g: false },
+      { type: "7-11", name: "日式蕎麥風味麵", cal: 320, protein: 11.2, per100g: false },
       { type: "全家", name: "健身G肉餐盒", cal: 445, protein: 30.5, per100g: false },
       { type: "全家", name: "茶葉蛋 (1顆)", cal: 76, protein: 7.1, per100g: false },
       { type: "全家", name: "夯番薯 (約150g)", cal: 195, protein: 2.1, per100g: false },
@@ -422,28 +433,35 @@
       { type: "TFDA", name: "白米飯", cal: 183, protein: 3.1, per100g: true }
     ];
 
-    // 支援從 GitHub Raw 讀取 JSON 資料庫
+    // 自動讀取外部 JSON 資料庫
     async function loadExternalFoods() {
       const githubUrl = localStorage.getItem('github_db_url');
       const candidateUrls = [];
       if (githubUrl) candidateUrls.push(githubUrl);
-      candidateUrls.push('food.json', 'foods.json');
+      
+      candidateUrls.push(
+        'food.json',
+        'foods.json',
+        '300.json',
+        encodeURI('300種.json')
+      );
 
       for (const url of candidateUrls) {
         try {
           const res = await fetch(url);
           if (res.ok) {
             const externalFoods = await res.json();
-            if (Array.isArray(externalFoods)) {
-              defaultDatabase.unshift(...externalFoods);
+            if (Array.isArray(externalFoods) && externalFoods.length > 0) {
+              const existingNames = new Set(defaultDatabase.map(item => item.name));
+              const newItems = externalFoods.filter(item => item && item.name && !existingNames.has(item.name));
+              defaultDatabase.unshift(...newItems);
               renderQuickChips();
               break;
             }
           }
-        } catch (err) {
-          console.warn(`讀取資料庫失敗: ${url}`, err);
-        }
+        } catch (err) {}
       }
+      renderQuickChips();
     }
 
     function getFullDatabase() {
@@ -654,7 +672,6 @@
       try {
         const base64 = await resizeImageToBase64(file, 800);
         
-        // 主要使用 gemini-3.8-flash，備援 gemini-2.5-flash
         const visionModels = ['gemini-3.8-flash', 'gemini-2.5-flash'];
         let data = null;
         let lastError = null;
@@ -730,13 +747,13 @@
 
     function renderQuickChips() {
       const container = document.getElementById('quickChips');
+      const db = getFullDatabase();
       const popular = [
-        defaultDatabase[4],
-        defaultDatabase[0],
-        defaultDatabase[7],
-        defaultDatabase[8],
-        defaultDatabase[10],
-        defaultDatabase[14]
+        db.find(i => i.name.includes("茶葉蛋")),
+        db.find(i => i.name.includes("高纖豆漿")),
+        db.find(i => i.name.includes("三明治")),
+        db.find(i => i.name.includes("飯糰")),
+        db.find(i => i.name.includes("烤雞胸"))
       ].filter(Boolean);
 
       container.innerHTML = '';
@@ -747,20 +764,38 @@
         chip.onclick = () => selectItem(item);
         container.appendChild(chip);
       });
-      document.getElementById('dbCountText').innerText = `收錄 ${getFullDatabase().length} 筆食品`;
+      document.getElementById('dbCountText').innerText = `收錄 ${db.length} 筆食品`;
     }
 
+    // 搜尋功能實作
     function handleSearch() {
-      const q = document.getElementById('foodSearch').value.trim().toLowerCase();
+      const input = document.getElementById('foodSearch');
       const suggestions = document.getElementById('suggestions');
-      if (!q) { suggestions.style.display = 'none'; return; }
+      if (!input || !suggestions) return;
+
+      const q = input.value.trim().toLowerCase();
+      if (!q) {
+        suggestions.style.display = 'none';
+        return;
+      }
 
       const db = getFullDatabase();
-      const matches = db.filter(f => f.name.toLowerCase().includes(q) || f.type.toLowerCase().includes(q) || (f.barcode && f.barcode.includes(q)));
-      if (matches.length === 0) { suggestions.style.display = 'none'; return; }
+      const matches = db.filter(f => {
+        if (!f || !f.name) return false;
+        const name = String(f.name).toLowerCase();
+        const type = String(f.type || '').toLowerCase();
+        const barcode = String(f.barcode || '');
+        return name.includes(q) || type.includes(q) || barcode.includes(q);
+      });
+
+      if (matches.length === 0) {
+        suggestions.innerHTML = '<div style="padding:12px; font-size:13px; color:var(--muted); text-align:center;">無符合的食品項目</div>';
+        suggestions.style.display = 'block';
+        return;
+      }
 
       suggestions.innerHTML = '';
-      matches.forEach(item => {
+      matches.slice(0, 50).forEach(item => {
         const div = document.createElement('div');
         div.className = 'suggestion-item';
         let badgeClass = 'badge-food';
@@ -770,18 +805,27 @@
 
         const unitText = item.per100g ? "/100g" : "";
         div.innerHTML = `
-          <span><span class="badge ${badgeClass}">${item.type}</span>${item.name}</span>
+          <span><span class="badge ${badgeClass}">${item.type || '食品'}</span>${item.name}</span>
           <span style="color:var(--muted);">${item.cal} kcal | 蛋 ${item.protein}g ${unitText}</span>
         `;
         div.onclick = () => {
           selectItem(item);
           suggestions.style.display = 'none';
-          document.getElementById('foodSearch').value = '';
+          input.value = '';
         };
         suggestions.appendChild(div);
       });
       suggestions.style.display = 'block';
     }
+
+    // 點擊空白處自動隱藏選單
+    document.addEventListener('click', (e) => {
+      const suggestions = document.getElementById('suggestions');
+      const foodSearch = document.getElementById('foodSearch');
+      if (suggestions && foodSearch && !foodSearch.contains(e.target) && !suggestions.contains(e.target)) {
+        suggestions.style.display = 'none';
+      }
+    });
 
     function selectItem(item) {
       if (item.per100g) {
@@ -820,7 +864,7 @@
       localStorage.setItem('gemini_api_key', key);
       localStorage.setItem('github_db_url', url);
       alert('設定已儲存！');
-      if (url) loadExternalFoods();
+      loadExternalFoods();
     }
 
     function submitEntry() {
