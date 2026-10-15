@@ -3,15 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>台灣飲食熱量與營養管理 (gemini-3.5-flash 版)</title>
+  <title>台灣飲食熱量與營養管理</title>
   
-  <!-- iOS 專屬 PWA 全螢幕與圖示支援 -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="熱量管理">
   <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2921/2921822.png">
 
-  <!-- 免費開源條碼掃描套件 (Html5-QRCode) -->
+  <!-- 免費開源條碼掃描套件 -->
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 
   <style>
@@ -81,9 +80,7 @@
       padding: 10px 16px;
       font-weight: 600;
       cursor: pointer;
-      transition: opacity 0.2s;
     }
-    button:active { opacity: 0.8; }
     .btn-secondary { background: #e2e8f0; color: #334155; }
     
     .btn-barcode {
@@ -177,7 +174,6 @@
       align-items: center;
       font-size: 13px;
     }
-    .suggestion-item:active, .suggestion-item:hover { background: #f8fafc; }
     .badge {
       font-size: 11px;
       padding: 2px 6px;
@@ -238,10 +234,68 @@
     </div>
   </div>
 
-  <!-- TDEE 自動計算機與個人目標設定 -->
+  <!-- AI 拍照辨識區塊 (置於上方，方便立刻使用) -->
+  <div class="card">
+    <h3>📸 AI 拍照辨識食物</h3>
+    <div class="camera-wrapper">
+      <button class="btn-ai">📷 拍照 / 上傳食物照片辨識</button>
+      <input type="file" id="fileInput" accept="image/*" capture="environment" onchange="handleImage(event)">
+    </div>
+    <img id="imagePreview" class="preview-img" alt="預覽照片">
+    <div id="statusText" style="font-size:12px; color:var(--muted); margin-top:6px; text-align:center;"></div>
+    
+    <details style="margin-top: 10px;">
+      <summary style="font-size: 12px; color: var(--muted); cursor: pointer;">🔑 設定 Gemini API Key (點此展開)</summary>
+      <div style="margin-top: 8px;">
+        <input type="password" id="apiKey" placeholder="貼上 Google Gemini API Key" style="width: 100%; margin-bottom: 6px;">
+        <button style="width: 100%; font-size: 12px; padding: 6px;" onclick="saveKey()">儲存金鑰</button>
+      </div>
+    </details>
+  </div>
+
+  <!-- 條碼掃描功能區塊 -->
+  <div class="card">
+    <h3>📷 條碼掃描辨識 (超商包裝)</h3>
+    <button class="btn-barcode" id="startScanBtn" onclick="toggleScanner()">
+      <span>⚡ 開啟相機掃描條碼</span>
+    </button>
+    <button class="btn-stop" id="stopScanBtn" onclick="stopScanner()">關閉鏡頭</button>
+    
+    <div id="reader"></div>
+    <div id="scanStatus" style="font-size:12px; color:var(--muted); margin-top:8px; text-align:center;">
+      點擊按鈕開啟鏡頭，對準超商鮮食或飲料的一維條碼 (EAN-13)
+    </div>
+  </div>
+
+  <!-- 食物資料庫搜尋 (超商 + TFDA + 外部 food.json) -->
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h3 style="margin:0;">🔍 搜尋飲食庫</h3>
+      <span style="font-size:12px; color:var(--muted);" id="dbCountText"></span>
+    </div>
+    <div class="search-wrapper" style="margin-top:8px;">
+      <input type="text" id="foodSearch" placeholder="搜尋 7-11、全家、小吃、地瓜、雞胸肉..." oninput="handleSearch()">
+      <div id="suggestions" class="suggestions"></div>
+    </div>
+    <div style="font-size: 12px; color: var(--muted);">常用快選：</div>
+    <div class="quick-chips" id="quickChips"></div>
+  </div>
+
+  <!-- 確認加入與新增區塊 -->
+  <div class="card">
+    <h3>確認加入清單</h3>
+    <div class="input-group">
+      <input type="text" id="entryName" placeholder="食物名稱">
+      <input type="number" id="entryCal" placeholder="熱量 (kcal)" style="max-width: 90px;">
+      <input type="number" id="entryProtein" placeholder="蛋白質 (g)" style="max-width: 90px;" step="0.1">
+    </div>
+    <button style="width: 100%;" onclick="submitEntry()">確認加入今日清單</button>
+  </div>
+
+  <!-- TDEE 自動計算機 (預設收合，不佔空間) -->
   <div class="card">
     <details id="tdeeDetails">
-      <summary style="font-weight: 600; cursor: pointer; color: #475569;">⚙️ 設定熱量目標與 TDEE 自動計算</summary>
+      <summary style="font-weight: 600; cursor: pointer; color: #475569;">⚙️ 設定熱量目標與 TDEE 自動計算 (點擊展開)</summary>
       <div style="margin-top: 12px;">
         <div class="grid-2">
           <div>
@@ -271,7 +325,7 @@
         <div style="margin-bottom: 8px;">
           <label style="font-size: 12px; color: var(--muted);">每週活動量</label>
           <select id="userActivity" style="width: 100%;">
-            <option value="1.2">久坐 / 幾乎不運動 (辦公族)</option>
+            <option value="1.2">久坐 / 幾乎不運動</option>
             <option value="1.375">輕度活動 (每週運動 1-3 天)</option>
             <option value="1.55" selected>中度活動 (每週運動 3-5 天)</option>
             <option value="1.725">高活動量 (每週運動 6-7 天)</option>
@@ -306,62 +360,6 @@
     </details>
   </div>
 
-  <!-- 條碼掃描功能區塊 -->
-  <div class="card">
-    <h3>📷 條碼掃描辨識 (超商包裝)</h3>
-    <button class="btn-barcode" id="startScanBtn" onclick="toggleScanner()">
-      <span>⚡ 開啟相機掃描條碼</span>
-    </button>
-    <button class="btn-stop" id="stopScanBtn" onclick="stopScanner()">關閉鏡頭</button>
-    
-    <div id="reader"></div>
-    <div id="scanStatus" style="font-size:12px; color:var(--muted); margin-top:8px; text-align:center;">
-      點擊按鈕開啟鏡頭，對準超商鮮食或飲料的一維條碼 (EAN-13)
-    </div>
-  </div>
-
-  <!-- AI 拍照辨識區塊 -->
-  <div class="card">
-    <details>
-      <summary style="font-weight: 600; cursor: pointer; color: #475569;">📸 AI 拍照辨識食物 (Gemini API)</summary>
-      <div style="margin-top: 10px;">
-        <input type="password" id="apiKey" placeholder="貼上 Google Gemini API Key" style="width: 100%; margin-bottom: 8px;">
-        <button style="width: 100%; font-size: 13px; margin-bottom: 8px;" onclick="saveKey()">儲存金鑰至手機</button>
-        <div class="camera-wrapper">
-          <button class="btn-ai">📷 拍照 / 上傳食物照片辨識</button>
-          <input type="file" id="fileInput" accept="image/*" capture="environment" onchange="handleImage(event)">
-        </div>
-        <img id="imagePreview" class="preview-img" alt="預覽照片">
-        <div id="statusText" style="font-size:12px; color:var(--muted); margin-top:6px; text-align:center;"></div>
-      </div>
-    </details>
-  </div>
-
-  <!-- 食物資料庫搜尋 (超商 + TFDA + 外部 food.json) -->
-  <div class="card">
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-      <h3 style="margin:0;">🔍 搜尋飲食庫</h3>
-      <span style="font-size:12px; color:var(--muted);" id="dbCountText"></span>
-    </div>
-    <div class="search-wrapper" style="margin-top:8px;">
-      <input type="text" id="foodSearch" placeholder="搜尋 7-11、全家、小吃、地瓜、雞胸肉..." oninput="handleSearch()">
-      <div id="suggestions" class="suggestions"></div>
-    </div>
-    <div style="font-size: 12px; color: var(--muted);">常用快選：</div>
-    <div class="quick-chips" id="quickChips"></div>
-  </div>
-
-  <!-- 確認加入與新增區塊 -->
-  <div class="card">
-    <h3>確認加入清單</h3>
-    <div class="input-group">
-      <input type="text" id="entryName" placeholder="食物名稱">
-      <input type="number" id="entryCal" placeholder="熱量 (kcal)" style="max-width: 90px;">
-      <input type="number" id="entryProtein" placeholder="蛋白質 (g)" style="max-width: 90px;" step="0.1">
-    </div>
-    <button style="width: 100%;" onclick="submitEntry()">確認加入今日清單</button>
-  </div>
-
   <!-- 當日明細清單與備份匯出 -->
   <div class="card">
     <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -372,9 +370,7 @@
   </div>
 
   <script>
-    // 預設內建資料庫
     let defaultDatabase = [
-      // 常用超商條碼商品
       { barcode: "4710088430930", type: "7-11", name: "統一無糖高纖豆漿 (450ml)", cal: 161, protein: 15.3, per100g: false },
       { barcode: "4710088430923", type: "7-11", name: "統一低糖高纖豆漿 (450ml)", cal: 189, protein: 15.3, per100g: false },
       { barcode: "4710018131333", type: "全家", name: "光泉濃豆漿無加糖 (375ml)", cal: 191, protein: 19.1, per100g: false },
@@ -382,60 +378,17 @@
       { barcode: "4710174099416", type: "7-11", name: "大成 經典法式舒肥雞胸肉", cal: 135, protein: 23.5, per100g: false },
       { barcode: "4710174099423", type: "全家", name: "大成 迷迭香舒肥雞胸肉", cal: 128, protein: 23.0, per100g: false },
       { barcode: "4710088431104", type: "7-11", name: "Dr. Milker 極鮮乳 (250ml)", cal: 165, protein: 7.8, per100g: false },
-      
-      // 7-ELEVEN 常用鮮食
-      { type: "7-11", name: "卜蜂 義式黑椒雞胸肉", cal: 125, protein: 22.0, per100g: false },
-      { type: "7-11", name: "21Plus 椒麻烤雞胸肉", cal: 140, protein: 23.0, per100g: false },
       { type: "7-11", name: "茶葉蛋 (1顆)", cal: 75, protein: 7.0, per100g: false },
-      { type: "7-11", name: "石安牧場溫泉蛋 (2入)", cal: 132, protein: 12.2, per100g: false },
       { type: "7-11", name: "現蒸地瓜 (約150g)", cal: 190, protein: 2.0, per100g: false },
       { type: "7-11", name: "紐奧良風味烤雞三明治", cal: 285, protein: 12.5, per100g: false },
-      { type: "7-11", name: "起司三重奏三明治", cal: 320, protein: 10.0, per100g: false },
-      { type: "7-11", name: "鮪魚御飯糰", cal: 228, protein: 5.6, per100g: false },
-      { type: "7-11", name: "金沙烤豆腐溫沙拉", cal: 188, protein: 11.2, per100g: false },
-      { type: "7-11", name: "一日野菜 活力彩蔬沙拉", cal: 35, protein: 1.5, per100g: false },
-      { type: "7-11", name: "爪哇咖哩飯", cal: 710, protein: 16.5, per100g: false },
-      { type: "7-11", name: "真飽 經典排骨便當", cal: 885, protein: 31.0, per100g: false },
-      { type: "7-11", name: "真飽 原味麻醬涼麵", cal: 645, protein: 15.0, per100g: false },
-      { type: "7-11", name: "帕瑪森肉醬義大利麵", cal: 520, protein: 19.5, per100g: false },
-
-      // 全家 FamilyMart 常用鮮食
-      { type: "全家", name: "卜蜂 鹽蔥雞胸肉", cal: 130, protein: 22.5, per100g: false },
       { type: "全家", name: "健身G肉餐盒", cal: 445, protein: 30.5, per100g: false },
-      { type: "全家", name: "香草烤雞腿薑黃飯椒麻餐盒", cal: 480, protein: 26.0, per100g: false },
       { type: "全家", name: "茶葉蛋 (1顆)", cal: 76, protein: 7.1, per100g: false },
       { type: "全家", name: "夯番薯 (約150g)", cal: 195, protein: 2.1, per100g: false },
-      { type: "全家", name: "烤多汁雞腿排 (熟食保溫櫃)", cal: 215, protein: 18.2, per100g: false },
-      { type: "全家", name: "大口 經典烤雞握飯糰", cal: 395, protein: 14.5, per100g: false },
-      { type: "全家", name: "金咖哩 濃辛牛肉咖哩飯", cal: 725, protein: 18.0, per100g: false },
-      { type: "全家", name: "義式番茄嫩豆腐蔬菜湯", cal: 110, protein: 6.2, per100g: false },
-      { type: "全家", name: "凱薩雞肉沙拉", cal: 165, protein: 9.8, per100g: false },
-
-      // 台式外食與小吃
       { type: "小吃", name: "台式滷肉飯 (中碗約200g)", cal: 440, protein: 11.0, per100g: false },
-      { type: "小吃", name: "台式炸排骨便當 (整份)", cal: 850, protein: 32.0, per100g: false },
-      { type: "小吃", name: "台式炸雞腿便當 (整份)", cal: 920, protein: 38.0, per100g: false },
-      { type: "小吃", name: "紅燒牛肉麵 (含湯麵肉)", cal: 680, protein: 35.0, per100g: false },
-      { type: "小吃", name: "八方雲集 招牌鍋貼 (1顆)", cal: 68, protein: 2.4, per100g: false },
-      { type: "小吃", name: "早餐店 原味蛋餅 (1份)", cal: 260, protein: 10.5, per100g: false },
-
-      // TFDA 衛福部原型食材庫 (每 100g 基準)
       { type: "TFDA", name: "去皮雞胸肉", cal: 109, protein: 24.2, per100g: true },
-      { type: "TFDA", name: "雞里肌肉", cal: 106, protein: 24.0, per100g: true },
-      { type: "TFDA", name: "去骨雞腿肉 (含皮)", cal: 198, protein: 17.5, per100g: true },
-      { type: "TFDA", name: "牛腱 / 牛後腿肉", cal: 122, protein: 21.8, per100g: true },
-      { type: "TFDA", name: "板腱低脂牛肉", cal: 160, protein: 22.0, per100g: true },
-      { type: "TFDA", name: "豬里肌肉", cal: 180, protein: 22.2, per100g: true },
-      { type: "TFDA", name: "白蝦仁 / 草蝦", cal: 100, protein: 22.0, per100g: true },
-      { type: "TFDA", name: "鮭魚切片", cal: 215, protein: 20.5, per100g: true },
-      { type: "TFDA", name: "白米飯", cal: 183, protein: 3.1, per100g: true },
-      { type: "TFDA", name: "地瓜 (黃肉甘藷)", cal: 114, protein: 1.4, per100g: true },
-      { type: "TFDA", name: "大燕麥片", cal: 406, protein: 11.0, per100g: true },
-      { type: "TFDA", name: "傳統豆腐 (北豆腐)", cal: 86, protein: 8.5, per100g: true },
-      { type: "TFDA", name: "水煮蛋 / 生雞蛋", cal: 144, protein: 12.8, per100g: true }
+      { type: "TFDA", name: "白米飯", cal: 183, protein: 3.1, per100g: true }
     ];
 
-    // 非同步載入 food.json
     async function loadExternalFoods() {
       const candidates = ['food.json', 'foods.json'];
       for (const file of candidates) {
@@ -445,7 +398,6 @@
             const externalFoods = await res.json();
             defaultDatabase.unshift(...externalFoods);
             renderQuickChips();
-            console.log(`成功載入 ${file}，新增了 ${externalFoods.length} 筆資料！`);
             break;
           }
         } catch (err) {}
@@ -457,11 +409,19 @@
       return [...customBarcodes, ...defaultDatabase];
     }
 
-    let currentDate = new Date().toISOString().split('T')[0];
+    // 取得當前本地 YYYY-MM-DD
+    function getTodayString() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    let currentDate = getTodayString();
     document.getElementById('datePicker').value = currentDate;
     document.getElementById('apiKey').value = localStorage.getItem('gemini_api_key') || '';
 
-    // TDEE 個人設定與計算
     function loadProfile() {
       const profile = JSON.parse(localStorage.getItem('calorie_user_profile') || '{}');
       if (profile.gender) document.getElementById('userGender').value = profile.gender;
@@ -576,7 +536,6 @@
         isScanning = true;
         status.innerText = '對準超商條碼即可自動辨識...';
       } catch (err) {
-        console.error(err);
         status.innerText = '無法啟動相機：請確認網址為 HTTPS 且已允許瀏覽器相機權限。';
         stopScanner();
       }
@@ -635,7 +594,7 @@
 
     let lastScannedBarcode = null;
 
-    // AI 拍照辨識食物 (指定 gemini-3.5-flash，含自動容錯切換)
+    // AI 拍照辨識 (自動相容端點)
     async function handleImage(event) {
       const file = event.target.files[0];
       if (!file) return;
@@ -653,9 +612,7 @@
 
       try {
         const base64 = await resizeImageToBase64(file, 800);
-        
-        // 優先呼叫 gemini-3.5-flash，備援 gemini-2.5-flash
-        const models = ['gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-2.0-flash'];
+        const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
         let data = null;
         let lastError = null;
 
@@ -689,14 +646,10 @@
           }
         }
 
-        if (!data) {
-          throw new Error(lastError || '模型無回應');
-        }
+        if (!data) throw new Error(lastError || '模型無回應');
 
         const candidate = data.candidates?.[0];
-        if (!candidate?.content?.parts?.[0]?.text) {
-          throw new Error('AI 回傳格式不符合預期');
-        }
+        if (!candidate?.content?.parts?.[0]?.text) throw new Error('AI 回傳格式不符合預期');
 
         const raw = candidate.content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
         const parsed = JSON.parse(raw);
@@ -729,16 +682,15 @@
       });
     }
 
-    // 搜尋與快選標籤
     function renderQuickChips() {
       const container = document.getElementById('quickChips');
       const popular = [
-        defaultDatabase[4], // 7-11 雞胸
-        defaultDatabase[0], // 7-11 豆漿
-        defaultDatabase[9], // 茶葉蛋
-        defaultDatabase[11], // 地瓜
-        defaultDatabase[22], // 全家 健身餐盒
-        defaultDatabase[37]  // TFDA 去皮雞胸肉
+        defaultDatabase[4],
+        defaultDatabase[0],
+        defaultDatabase[7],
+        defaultDatabase[8],
+        defaultDatabase[10],
+        defaultDatabase[14]
       ].filter(Boolean);
 
       container.innerHTML = '';
@@ -807,7 +759,6 @@
       document.getElementById('entryProtein').value = protein;
     }
 
-    // 儲存與日常紀錄
     function getStorage() {
       return JSON.parse(localStorage.getItem('calorie_tracker_data') || '{}');
     }
@@ -855,7 +806,6 @@
       saveStorage(data);
     }
 
-    // 畫面動態渲染與超標回饋
     function render() {
       const data = getStorage();
       const logs = data[currentDate] || [];
@@ -915,7 +865,6 @@
       document.getElementById('proteinRemainingText').innerText = remainingProtein > 0 ? `剩餘 ${remainingProtein} g` : `已達標！`;
     }
 
-    // 匯出 CSV 備份
     function exportToCSV() {
       const data = getStorage();
       let csv = "\uFEFF日期,食物名稱,熱量(kcal),蛋白質(g)\n";
@@ -937,7 +886,6 @@
       render();
     });
 
-    // 依序初始化
     loadExternalFoods();
     loadProfile();
     renderQuickChips();
