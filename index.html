@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>台灣飲食熱量與營養管理 (含4週體重預估)</title>
+  <title>台灣飲食熱量與營養管理 (含份數輸入版)</title>
   
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -292,7 +292,7 @@
         <label style="font-size:12px; color:var(--muted);">Gemini API Key：</label>
         <input type="password" id="apiKey" placeholder="貼上 Google Gemini API Key" style="width: 100%; margin-bottom: 6px;">
         
-        <label style="font-size:12px; color:var(--muted);">GitHub JSON 資料庫 Raw 網址：</label>
+        <label style="font-size:12px; color:var(--muted);">自訂 GitHub Raw 額外網址 (選填)：</label>
         <input type="text" id="githubDbUrl" placeholder="https://raw.githubusercontent.com/.../food.json" style="width: 100%; margin-bottom: 6px;">
         
         <button style="width: 100%; font-size: 12px; padding: 6px;" onclick="saveConfig()">儲存設定並同步資料庫</button>
@@ -328,7 +328,7 @@
     <div class="quick-chips" id="quickChips"></div>
   </div>
 
-  <!-- 確認加入與新增區塊 -->
+  <!-- 確認加入與新增區塊 (已新增份數輸入) -->
   <div class="card">
     <h3>確認加入清單</h3>
     <div class="input-group">
@@ -341,10 +341,20 @@
       <input type="text" id="entryName" placeholder="食物名稱">
     </div>
     <div class="input-group">
-      <input type="number" id="entryCal" placeholder="熱量 (kcal)">
-      <input type="number" id="entryProtein" placeholder="蛋白質 (g)" step="0.1">
+      <div style="flex: 1; display:flex; flex-direction:column;">
+        <label style="font-size:11px; color:var(--muted); margin-bottom:2px;">份數 (倍數)</label>
+        <input type="number" id="entryServings" value="1" min="0.1" step="0.5" placeholder="份數" oninput="handleServingChange()">
+      </div>
+      <div style="flex: 1.2; display:flex; flex-direction:column;">
+        <label style="font-size:11px; color:var(--muted); margin-bottom:2px;">熱量 (kcal)</label>
+        <input type="number" id="entryCal" placeholder="熱量">
+      </div>
+      <div style="flex: 1.2; display:flex; flex-direction:column;">
+        <label style="font-size:11px; color:var(--muted); margin-bottom:2px;">蛋白質 (g)</label>
+        <input type="number" id="entryProtein" placeholder="蛋白質" step="0.1">
+      </div>
     </div>
-    <button style="width: 100%;" onclick="submitEntry()">確認加入今日清單</button>
+    <button style="width: 100%; margin-top: 4px;" onclick="submitEntry()">確認加入今日清單</button>
   </div>
 
   <!-- TDEE 自動計算機 (含4週體重預估) -->
@@ -379,7 +389,7 @@
 
         <div style="margin-bottom: 8px;">
           <label style="font-size: 12px; color: var(--muted);">每週活動量</label>
-          <select id="userActivity" style="width: 100%;" onchange="calculateTDEE()">
+          <select id="userActivity" style="width: 100%;">
             <option value="1.2">久坐 / 幾乎不運動</option>
             <option value="1.375">輕度活動 (每週運動 1-3 天)</option>
             <option value="1.55" selected>中度活動 (每週運動 3-5 天)</option>
@@ -450,13 +460,20 @@
       { type: "TFDA", name: "白米飯", cal: 183, protein: 3.1, per100g: true }
     ];
 
-    // 同時讀取多個 JSON 資料庫並合併去重
+    // 多資料庫自動依序讀取與去重合併
     async function loadExternalFoods() {
-      const filesToLoad = ['food.json', 'food2.json'];
-      const customUrl = localStorage.getItem('github_db_url');
-      if (customUrl) filesToLoad.unshift(customUrl);
+      const databaseFiles = [
+        'food.json',
+        'food2.json',
+        'foods.json',
+        '300.json',
+        encodeURI('300種.json')
+      ];
 
-      for (const fileUrl of filesToLoad) {
+      const customUrl = localStorage.getItem('github_db_url');
+      if (customUrl) databaseFiles.unshift(customUrl);
+
+      for (const fileUrl of databaseFiles) {
         try {
           const res = await fetch(fileUrl);
           if (res.ok) {
@@ -511,7 +528,7 @@
       }
     }
 
-    // 計算 TDEE 並即時估算 4 週體重
+    // 計算 TDEE 並連動估算 4 週體重
     function calculateTDEE() {
       const gender = document.getElementById('userGender').value;
       const age = Number(document.getElementById('userAge').value);
@@ -541,7 +558,7 @@
       return { bmr, tdee, recCal, recProtein, gender, age, height, weight, activity, goal };
     }
 
-    // 計算並渲染 4 週後的預估體重
+    // 4 週體重預估計算
     function renderWeightPrediction(currentWeight, tdee, targetCal) {
       const box = document.getElementById('predictionBox');
       if (!currentWeight || !tdee || !targetCal) {
@@ -549,9 +566,7 @@
         return;
       }
 
-      // 每日熱量缺口 (負為赤字，正為盈餘)
       const dailyDeficit = targetCal - tdee;
-      // 4週 (28天) 總熱量差，除以 7700 kcal = 體重預估變化 (kg)
       const totalDeficit = dailyDeficit * 28;
       const weightChangeKg = totalDeficit / 7700;
       const predictedWeight = currentWeight + weightChangeKg;
@@ -575,7 +590,7 @@
                     `目前體重：<strong>${currentWeight.toFixed(1)} kg</strong><br>` +
                     `預計 4 週後體重：<strong>${predictedWeight.toFixed(1)} kg</strong> ` +
                     `（預計增重 <strong>${weightChangeKg.toFixed(1)} kg</strong>）<br>` +
-                    `<span style="font-size:12px; color:#b45309;">每週增加約 ${weeklyRate.toFixed(2)} kg，建議搭配阻力訓練以轉化為肌肉量。</span>`;
+                    `<span style="font-size:12px; color:#b45309;">每週增加約 ${weeklyRate.toFixed(2)} kg，建議搭配阻力訓練轉化為肌肉量。</span>`;
       } else {
         box.style.background = "#f1f5f9";
         box.style.borderColor = "#cbd5e1";
@@ -614,7 +629,7 @@
       document.getElementById('targetProteinInput').value = res.recProtein;
       document.getElementById('targetCalDisplay').innerText = res.recCal;
       document.getElementById('targetProteinDisplay').innerText = res.recProtein;
-      alert(`已更新設定！每日目標為 ${res.recCal} kcal，已同步預估 4 週後體重趨勢。`);
+      alert(`已更新設定！每日目標為 ${res.recCal} kcal，已同步預估 4 週後體重。`);
       render();
     }
 
@@ -838,7 +853,7 @@
       document.getElementById('dbCountText').innerText = `收錄 ${db.length} 筆食品`;
     }
 
-    // 核心搜尋邏輯
+    // 搜尋比對與顯示
     function executeSearch(query) {
       const suggestions = document.getElementById('suggestions');
       const input = document.getElementById('foodSearch');
@@ -890,6 +905,7 @@
       suggestions.style.display = 'block';
     }
 
+    // 中文輸入法完整監聽
     const searchInput = document.getElementById('foodSearch');
     let isComposing = false;
 
@@ -913,6 +929,10 @@
       }
     });
 
+    // 紀錄單份基準數值，方便依份數動態倍增
+    let baseUnitCal = 0;
+    let baseUnitProtein = 0;
+
     function selectItem(item) {
       if (item.per100g) {
         const grams = prompt(`「${item.name}」基準為每 100g。\n請輸入實際食用克數 (g)：`, "100");
@@ -930,9 +950,21 @@
     }
 
     function fillForm(name, cal, protein) {
+      baseUnitCal = Number(cal) || 0;
+      baseUnitProtein = Number(protein) || 0;
+      document.getElementById('entryServings').value = 1;
       document.getElementById('entryName').value = name;
-      document.getElementById('entryCal').value = cal;
-      document.getElementById('entryProtein').value = protein;
+      document.getElementById('entryCal').value = baseUnitCal;
+      document.getElementById('entryProtein').value = baseUnitProtein;
+    }
+
+    // 份數變更時動態換算熱量與蛋白質
+    function handleServingChange() {
+      const servings = Number(document.getElementById('entryServings').value) || 1;
+      if (baseUnitCal > 0 || baseUnitProtein > 0) {
+        document.getElementById('entryCal').value = Math.round(baseUnitCal * servings);
+        document.getElementById('entryProtein').value = Math.round(baseUnitProtein * servings * 10) / 10;
+      }
     }
 
     function getStorage() {
@@ -954,11 +986,17 @@
     }
 
     function submitEntry() {
-      const name = document.getElementById('entryName').value.trim();
+      let name = document.getElementById('entryName').value.trim();
       const cal = document.getElementById('entryCal').value;
       const protein = document.getElementById('entryProtein').value;
       const meal = document.getElementById('mealTypeSelect').value || 'lunch';
+      const servings = Number(document.getElementById('entryServings').value) || 1;
       if (!name) return;
+
+      // 若份數不為 1，在名稱後加上份數標籤
+      if (servings !== 1) {
+        name = `${name} (x${servings}份)`;
+      }
 
       if (lastScannedBarcode) {
         const custom = JSON.parse(localStorage.getItem('calorie_custom_barcodes') || '[]');
@@ -981,6 +1019,9 @@
       document.getElementById('entryName').value = '';
       document.getElementById('entryCal').value = '';
       document.getElementById('entryProtein').value = '';
+      document.getElementById('entryServings').value = 1;
+      baseUnitCal = 0;
+      baseUnitProtein = 0;
       document.getElementById('imagePreview').style.display = 'none';
       document.getElementById('statusText').innerText = '';
     }
