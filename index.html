@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>台灣飲食熱量與營養管理 (含份數輸入版)</title>
+  <title>台灣飲食熱量與營養管理 (雙資料庫完整版)</title>
   
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -287,13 +287,13 @@
     <div id="statusText" style="font-size:12px; color:var(--muted); margin-top:6px; text-align:center;"></div>
     
     <details style="margin-top: 10px;">
-      <summary style="font-size: 12px; color: var(--muted); cursor: pointer;">🔑 設定 API Key 與 GitHub 資料庫 (點此展開)</summary>
+      <summary style="font-size: 12px; color: var(--muted); cursor: pointer;">🔑 設定 API Key (點此展開)</summary>
       <div style="margin-top: 8px;">
         <label style="font-size:12px; color:var(--muted);">Gemini API Key：</label>
         <input type="password" id="apiKey" placeholder="貼上 Google Gemini API Key" style="width: 100%; margin-bottom: 6px;">
         
-        <label style="font-size:12px; color:var(--muted);">自訂 GitHub Raw 額外網址 (選填)：</label>
-        <input type="text" id="githubDbUrl" placeholder="https://raw.githubusercontent.com/.../food.json" style="width: 100%; margin-bottom: 6px;">
+        <label style="font-size:12px; color:var(--muted);">自訂第三方 Raw 網址 (一般留空即可自動讀取 food.json 和 food2.json)：</label>
+        <input type="text" id="githubDbUrl" placeholder="一般留空即可" style="width: 100%; margin-bottom: 6px;">
         
         <button style="width: 100%; font-size: 12px; padding: 6px;" onclick="saveConfig()">儲存設定並同步資料庫</button>
       </div>
@@ -318,7 +318,7 @@
   <div class="card search-card">
     <div style="display:flex; justify-content:space-between; align-items:center;">
       <h3 style="margin:0;">🔍 搜尋飲食庫</h3>
-      <span style="font-size:12px; color:var(--muted);" id="dbCountText">收錄 0 筆食品</span>
+      <span style="font-size:12px; color:var(--muted);" id="dbCountText">載入中...</span>
     </div>
     <div class="search-wrapper" style="margin-top:8px;">
       <input type="text" id="foodSearch" placeholder="搜尋 7-11、全家、小吃、地瓜、雞胸肉..." autocomplete="off">
@@ -328,7 +328,7 @@
     <div class="quick-chips" id="quickChips"></div>
   </div>
 
-  <!-- 確認加入與新增區塊 (已新增份數輸入) -->
+  <!-- 確認加入與新增區塊 (含份數輸入) -->
   <div class="card">
     <h3>確認加入清單</h3>
     <div class="input-group">
@@ -342,7 +342,7 @@
     </div>
     <div class="input-group">
       <div style="flex: 1; display:flex; flex-direction:column;">
-        <label style="font-size:11px; color:var(--muted); margin-bottom:2px;">份數 (倍數)</label>
+        <label style="font-size:11px; color:var(--muted); margin-bottom:2px;">份數</label>
         <input type="number" id="entryServings" value="1" min="0.1" step="0.5" placeholder="份數" oninput="handleServingChange()">
       </div>
       <div style="flex: 1.2; display:flex; flex-direction:column;">
@@ -460,22 +460,15 @@
       { type: "TFDA", name: "白米飯", cal: 183, protein: 3.1, per100g: true }
     ];
 
-    // 多資料庫自動依序讀取與去重合併
+    // 多資料庫讀取核心：逐一讀取並合併，不使用 break 終止
     async function loadExternalFoods() {
-      const databaseFiles = [
-        'food.json',
-        'food2.json',
-        'foods.json',
-        '300.json',
-        encodeURI('300種.json')
-      ];
-
+      const databaseFiles = ['food.json', 'food2.json'];
       const customUrl = localStorage.getItem('github_db_url');
       if (customUrl) databaseFiles.unshift(customUrl);
 
       for (const fileUrl of databaseFiles) {
         try {
-          const res = await fetch(fileUrl);
+          const res = await fetch(`${fileUrl}?v=${Date.now()}`);
           if (res.ok) {
             const externalFoods = await res.json();
             if (Array.isArray(externalFoods) && externalFoods.length > 0) {
@@ -484,7 +477,9 @@
               defaultDatabase.unshift(...newItems);
             }
           }
-        } catch (err) {}
+        } catch (err) {
+          console.warn(`讀取失敗或檔案不存在: ${fileUrl}`);
+        }
       }
       renderQuickChips();
     }
@@ -929,7 +924,6 @@
       }
     });
 
-    // 紀錄單份基準數值，方便依份數動態倍增
     let baseUnitCal = 0;
     let baseUnitProtein = 0;
 
@@ -958,7 +952,6 @@
       document.getElementById('entryProtein').value = baseUnitProtein;
     }
 
-    // 份數變更時動態換算熱量與蛋白質
     function handleServingChange() {
       const servings = Number(document.getElementById('entryServings').value) || 1;
       if (baseUnitCal > 0 || baseUnitProtein > 0) {
@@ -993,7 +986,6 @@
       const servings = Number(document.getElementById('entryServings').value) || 1;
       if (!name) return;
 
-      // 若份數不為 1，在名稱後加上份數標籤
       if (servings !== 1) {
         name = `${name} (x${servings}份)`;
       }
